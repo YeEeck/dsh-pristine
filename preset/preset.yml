@@ -1,0 +1,2 @@
+name: Pristine
+description: Guarantee a pure Minimal first model request (no AGENTS.md/CLAUDE.md or skill injections) via one visible warmup round, then process the real prompt with the full Standard catalog.

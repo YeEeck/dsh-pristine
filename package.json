@@ -1,0 +1,15 @@
+{
+  "name": "dsh-pristine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeepSeek Harness preset: pure Minimal first model request, then the full Standard catalog",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check preset/warmup-bootstrap.mjs && node --test"
+  }
+}
