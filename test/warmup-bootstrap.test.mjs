@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { apply, inject, name } from '../preset/warmup-bootstrap.mjs'
 
-const VALID_CONFIG = { shellTools: ['bash', 'pwsh'], commonTools: ['read'], subagents: false }
+const VALID_CONFIG = { shellTools: ['bash', 'pwsh'], commonTools: ['str_replace_editor'], subagents: false }
 
 function makeCalls() {
   return { warn: [], info: [], prepends: [], route: [] }
@@ -70,18 +70,18 @@ test('rejects invalid tool-list config', () => {
     /shellTools must be a non-empty array of non-empty strings/,
   )
   assert.throws(
-    () => apply(ctx, { ...VALID_CONFIG, commonTools: ['read', ''] }),
+    () => apply(ctx, { ...VALID_CONFIG, commonTools: ['str_replace_editor', ''] }),
     /commonTools must be a non-empty array of non-empty strings/,
   )
 })
 
-test('a pending warmup narrows the catalog to one shell plus read', async () => {
+test('a pending warmup narrows the catalog to Minimal\'s exact two tools', async () => {
   const h = harness()
   const agent = makeAgent({ calls: h.calls })
   arm(h, agent)
-  const result = await assemble(h, agent, tools('bash', 'read', 'edit', 'grep'))
+  const result = await assemble(h, agent, tools('bash', 'str_replace_editor', 'read', 'edit'))
   assert.equal(result.system, 'minimal persona')
-  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'read'])
+  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'str_replace_editor'])
 })
 
 test('without a pending warmup the catalog stays complete', async () => {
@@ -122,8 +122,8 @@ test('subagents: true arms subagent sessions too', async () => {
   const h = harness({ subagents: true })
   const agent = makeAgent({ calls: h.calls, origin: 'subagent' })
   arm(h, agent)
-  const result = await assemble(h, agent, tools('bash', 'read', 'edit'))
-  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'read'])
+  const result = await assemble(h, agent, tools('bash', 'str_replace_editor', 'edit'))
+  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'str_replace_editor'])
 })
 
 test('an insert without a message does not arm', async () => {

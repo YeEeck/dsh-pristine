@@ -14,7 +14,8 @@ DeepSeek V4 Pro 只有在 Minimal prompt 状态下才能达到能力上限。但
 第一次请求里，"名义上的 Minimal"其实并不 Minimal，能力最大化随之失效。
 
 本 preset 从机制上保证了纯净。会话的第一个 step 会被替换成一个热身回合，其请求
-只携带固定的 Minimal system prompt 和两项工具（`bash`/`pwsh` 加 `read`）；替换
+只携带固定的 Minimal system prompt 和 Minimal 的两项工具（`bash` 加
+`str_replace_editor`，名称、描述与 schema 与真实 Minimal 会话完全一致）；替换
 发生在 pre-step 瀑布的最外层，先于指令与 skill 注入执行，因此那些注入在这一请求
 中被直接丢弃，无法污染它。用户的真实第一条提示被推迟到下一回合，此后按正常流程
 处理：完整 Standard 目录、全部指令与 skills。
@@ -24,12 +25,16 @@ DeepSeek V4 Pro 只有在 Minimal prompt 状态下才能达到能力上限。但
 1. 新会话收到第一次输入时，第一个 step 变成热身回合，而不是回答用户；
 2. 热身请求只包含 Minimal 固定 system prompt（`You are a helpful software
    engineer assistant.`）和两项工具：一个本机 shell（Linux 为 `bash`，
-   Windows 为 `pwsh`）加 `read`。没有 AGENTS.md/CLAUDE.md 基线、没有 skill
-   目录、没有 skill 内容；
+   Windows 为 `pwsh`）加 `str_replace_editor`——即真实 Minimal 会话携带的
+   两件工具，名称、描述与 schema 完全一致。没有 AGENTS.md/CLAUDE.md 基线、
+   没有 skill 目录、没有 skill 内容；
 3. 热身消息是单一的目标句：只读地熟悉仓库，并以项目状态的简短总结结尾；它不
    点名任何工具或命令，尽量不干扰纯净的 Minimal 请求；
 4. 热身回合与普通回合一样可见地记录在轨迹里；
-5. 真实的第一条提示随后按正常流程处理，带完整 Standard 目录。
+5. 真实的第一条提示随后按正常流程处理，带完整 Standard 目录。完整目录中的
+   shell 是 Minimal 的持久 `bash`（名称、描述与 schema 完全一致；Windows 仍用
+   `pwsh`），`str_replace_editor` 加入 Standard 文件工具之列（`read`/`write`/
+   `edit`/`glob`/`grep` 保留）。
 
 子代理会话跳过热身。
 
@@ -41,7 +46,8 @@ DeepSeek V4 Pro 只有在 Minimal prompt 状态下才能达到能力上限。但
 - Linux / Node.js 22
 
 DeepSeek Harness 目前仍是开发者预览版，官方明确说明未来会有破坏性变更。本
-preset 是 Standard 组装的完整快照；升级 Harness 后，应先对照上游改动再继续使用。
+preset 是 Standard 组装 + Minimal 的 shell/editor 栈的快照；升级 Harness 后，
+应先对照上游改动再继续使用。
 
 ## 安装
 
@@ -96,10 +102,11 @@ cp -R preset "$dsh_home/.agent-presets/pristine"
 
 ## 验证加载
 
-- 第一个可见的 assistant 回合就是热身回合：只使用 shell 和 `read`，并以仓库
-  摘要结尾；
-- 导出 session JSONL，检查 `request/header`：第一份 header 应只有 `bash/read`
-  或 `pwsh/read`；下一份 header 应包含完整 Standard 目录。
+- 第一个可见的 assistant 回合就是热身回合：只使用 shell 和 `str_replace_editor`，
+  并以仓库摘要结尾；
+- 导出 session JSONL，检查 `request/header`：第一份 header 应只有
+  `bash/str_replace_editor` 或 `pwsh/str_replace_editor`；下一份 header 应包含
+  完整 Standard 目录。
 
 本仓库的零依赖测试：
 

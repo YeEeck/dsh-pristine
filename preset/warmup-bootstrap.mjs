@@ -9,8 +9,9 @@
  *  1. When the first input of a fresh session is queued, the plugin arms a
  *     per-agent pending flag (`agent/inbox/inserted`).
  *  2. While pending, `system-prompt/assemble` narrows the assembled tool
- *     catalog to one native shell plus `read`, so the warmup step's request
- *     header logs exactly that catalog (the system prompt stays the Minimal
+ *     catalog to one native shell plus `str_replace_editor` — the exact two
+ *     tools a real Minimal session presents — so the warmup step's
+ *     request/header logs that catalog (the system prompt stays the Minimal
  *     fixed text under the `complete` persona).
  *  3. On the first `agent/pre-step`, the claimed real input is moved back to
  *     the next-turn queue and the step's messages are replaced with one

@@ -5,8 +5,10 @@
 # baselines and skill injections enter the first request and pollute that
 # state. The warmup listener replaces the first step's messages outermost on
 # the pre-step waterfall — ahead of the instruction and skill injections — so
-# that first request carries ONLY the fixed minimal prompt and two tools (one
-# native shell plus `read`), and the discarded injections never reach it.
+# that first request carries ONLY the fixed minimal prompt and Minimal's exact
+# two tools (`bash` + `str_replace_editor`, same names, descriptions, and
+# schemas as a real Minimal session), and the discarded injections never
+# reach it.
 # After the warmup turn completes, the user's first prompt is processed
 # normally with the full Standard catalog.
 #
@@ -47,14 +49,15 @@
 #
 # The session's very first step becomes a WARMUP ROUND run by
 # `warmup-bootstrap.mjs` through the normal agent loop: that step's
-# request/header carries ONLY the Minimal fixed system prompt and the two
-# tools below — no AGENTS.md/CLAUDE.md baseline, no skill catalog, no skill
-# content. The `message` below is deliberately a goal-only sentence: it names
-# the requirement (familiarize yourself, then summarize) without enumerating
-# tools or commands, so the message itself disturbs the pure Minimal request
-# as little as possible. The user's first prompt is deferred to the following
-# turn, which is processed normally (full catalog, all context); later
-# prompts are unaffected. Subagent sessions skip the warmup.
+# request/header carries ONLY the Minimal fixed system prompt and Minimal's
+# exact two tools (`bash` + `str_replace_editor`) — no AGENTS.md/CLAUDE.md
+# baseline, no skill catalog, no skill content. The `message` below is
+# deliberately a goal-only sentence: it names the requirement (familiarize
+# yourself, then summarize) without enumerating tools or commands, so the
+# message itself disturbs the pure Minimal request as little as possible. The
+# user's first prompt is deferred to the following turn, which is processed
+# normally (full catalog, all context); later prompts are unaffected.
+# Subagent sessions skip the warmup.
 #
 # This row MUST stay ahead of `agent-instructions`: the warmup listener
 # replaces the step's messages, and it has to run before the instruction and
@@ -63,7 +66,7 @@
   name: ./warmup-bootstrap.mjs
   config:
     shellTools: [bash, pwsh]
-    commonTools: [read]
+    commonTools: [str_replace_editor]
     subagents: false
     message: >-
       Familiarize yourself with the repository this session works in, then give
@@ -77,16 +80,49 @@
 
 # ── shell ───────────────────────────────────────────────────────────────────
 
-# `shell-env` stays in the HOST composition: `apps/cli/src/web.ts` injects it to
-# publish `DSH_WEB_URL`/`DSH_WEB_MODE`, and a host row that injects a service is
-# the criterion for host-plane ownership — injection resolves before any session
-# exists, so there is no agent to key by. Behind a preset realm those variables
-# never reached the model's shell at all. Both shell tools consume the host
-# registry from here; their executors (`bash-sandbox`/`pwsh-sandbox`) are
-# host-plane too.
-- id: tool-bash
-  name: '@deepseek-ai/dsh-tool-bash'
+# The model-facing shell is Minimal's PERSISTENT bash: the same PTY stack, the
+# same tool name, and the byte-identical description as the shipped `minimal`
+# preset. Standard `tool-bash` is gone — both packages register the tool name
+# `bash`, so they cannot coexist — and the persistent shell is the schema the
+# pure Minimal state must present. `shell-env` stays in the HOST composition
+# (`apps/cli/src/web.ts` injects it to publish `DSH_WEB_URL`/`DSH_WEB_MODE`);
+# the backend still consumes the host sandbox policy and subprocess
+# implementation.
+#
+# The PTY (`terminals`) registry is an agent-owned service, so it lives in an
+# entry-local realm, exactly as in Minimal.
+#
+# `tool-pwsh` remains as the Windows shell: Minimal's terminal-bash hardcodes
+# `/bin/bash`, so on win32 the persistent-shell group is disabled and pwsh
+# keeps a working shell. On Linux/macOS the catalog matches Minimal exactly.
+- id: persistent-shell
+  name: cordis:group
+  group: true
   disabled: !!js process.platform === 'win32'
+  isolate:
+    terminals: true
+  config:
+    - id: pty
+      name: '@deepseek-ai/dsh-terminal'
+
+    - id: terminal-bash
+      name: '@deepseek-ai/dsh-terminal-bash'
+      config:
+        timeoutMs: 300000
+
+    - id: persistent-bash
+      name: '@deepseek-ai/dsh-tool-bash-persistent'
+      config:
+        timeoutMs: 300000
+        description: |-
+          Run commands in a bash shell
+          * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
+          * You don't have access to the internet via this tool.
+          * You do have access to a mirror of common linux and python packages via apt and pip.
+          * State is persistent across command calls and discussions with the user.
+          * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
+          * Please avoid commands that may produce a very large amount of output.
+          * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
 
 - id: tool-pwsh
   name: '@deepseek-ai/dsh-tool-pwsh'
@@ -94,8 +130,31 @@
 
 # ── filesystem ──────────────────────────────────────────────────────────────
 
-# Both register into the host `tools` registry and provide nothing, so
-# they need no realm. The `fs` service and its policy stay in the host.
+# Minimal's editor stack, copied verbatim: `fs-local` shadows the host's
+# sandboxed provider for this preset's editor only — inside an entry-local
+# realm — and `str_replace_editor` is the model-facing tool (same name,
+# description, and schema as Minimal). It requires absolute paths.
+#
+# The standard `tool-fs`/`tool-fs-search` rows stay OUTSIDE the realm: they
+# keep consuming the host sandboxed `fs`, so `read`/`write`/`edit`/`glob`/
+# `grep` remain available to the full catalog. Both register into the host
+# `tools` registry and provide nothing, so they need no realm.
+- id: filesystem
+  name: cordis:group
+  group: true
+  isolate:
+    fs: true
+  config:
+    - id: fs-local
+      name: '@deepseek-ai/dsh-fs-local'
+      config:
+        cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+    - id: str-replace-editor
+      name: '@deepseek-ai/dsh-tool-str-replace-editor'
+      config:
+        maxOutputChars: 16000
+
 - id: tool-fs
   name: '@deepseek-ai/dsh-tool-fs'
 
@@ -107,12 +166,14 @@
 # ── background jobs ────────────────────────────────────────────────────────
 
 # Only the model-facing controls. The task REGISTRY stays on the host plane:
-# its producers sit outside any realm this file could put it in — `tool-bash`
-# above resolves it with `ctx.get`, and an entry-local realm here is invisible
-# to every sibling row, so `run_in_background` would answer "background jobs
-# unavailable" while these controls sat in the catalog. The registry is keyed by
-# owning agent anyway, so one host instance serves every session. What a preset
-# chooses is whether its agent can collect and stop background work at all.
+# the registry is keyed by owning agent, so one host instance serves every
+# session, and a preset only chooses whether its agent can collect and stop
+# background work at all.
+#
+# Note: the persistent bash tool's schema is Minimal's single-parameter one —
+# it has no `run_in_background` and produces no background jobs — so on
+# Linux/macOS these controls stay idle. `tool-pwsh` on Windows still produces
+# background jobs, which is why the controls remain in the catalog.
 - id: tool-jobs
   name: '@deepseek-ai/dsh-tool-jobs'
 

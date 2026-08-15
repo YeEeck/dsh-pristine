@@ -19,11 +19,13 @@ capability-maximizing state is lost.
 
 This preset holds the state by construction. The session's very first step is
 replaced with a warmup round whose request carries ONLY the fixed Minimal
-system prompt and two tools (`bash`/`pwsh` plus `read`). The replacement runs
-outermost on the pre-step waterfall, ahead of the instruction and skill
-injections, so those injections are discarded for this request instead of
-polluting it. The user's first prompt is deferred to the next turn and is then
-processed normally: full Standard catalog, all instructions and skills.
+system prompt and Minimal's exact two tools (`bash` plus `str_replace_editor`,
+same names, descriptions, and schemas as a real Minimal session). The
+replacement runs outermost on the pre-step waterfall, ahead of the instruction
+and skill injections, so those injections are discarded for this request
+instead of polluting it. The user's first prompt is deferred to the next turn
+and is then processed normally: full Standard catalog, all instructions and
+skills.
 
 ## What it does
 
@@ -31,15 +33,20 @@ processed normally: full Standard catalog, all instructions and skills.
    round instead of answering the user.
 2. The warmup request contains only the Minimal fixed system prompt
    (`You are a helpful software engineer assistant.`) and two tools: one
-   native shell (`bash` on Linux, `pwsh` on Windows) plus `read`. No
-   AGENTS.md/CLAUDE.md baseline, no skill catalog, no skill content.
+   native shell (`bash` on Linux, `pwsh` on Windows) plus `str_replace_editor`
+   — the exact two tools a real Minimal session presents, with identical
+   names, descriptions, and schemas. No AGENTS.md/CLAUDE.md baseline, no
+   skill catalog, no skill content.
 3. The warmup message is a single goal-only sentence: familiarize yourself
    with the repository read-only and end with a short summary of the project
    state. It names no tools or commands, so the message itself disturbs the
    pure Minimal request as little as possible.
 4. The warmup turn is visible in the trajectory like any other turn.
 5. The real first prompt is then processed normally with the full Standard
-   catalog.
+   catalog. The shell in the full catalog is Minimal's persistent `bash`
+   (identical name, description, and schema; `pwsh` remains the Windows
+   shell), and `str_replace_editor` joins the Standard file tools
+   (`read`/`write`/`edit`/`glob`/`grep` are kept).
 
 Subagent sessions skip the warmup.
 
@@ -51,8 +58,9 @@ Developed and tested against:
 - Node.js 22 on Linux
 
 DeepSeek Harness is currently a developer preview and explicitly permits
-breaking changes. This preset is a full snapshot of the Standard composition,
-so review upstream changes before using it with a newer release.
+breaking changes. This preset is a snapshot of the Standard composition with
+Minimal's shell and editor stack swapped in, so review upstream changes before
+using it with a newer release.
 
 ## Install
 
@@ -110,10 +118,10 @@ Fully restart DeepSeek Harness, create a blank session, and select
 ## Verify
 
 - The first visible assistant turn is the warmup: it uses only the shell and
-  `read` and ends with a repository summary.
+  `str_replace_editor` and ends with a repository summary.
 - Export the session JSONL and inspect `request/header` events: the first
-  header carries only `bash/read` or `pwsh/read`; the next header carries the
-  full Standard catalog.
+  header carries only `bash/str_replace_editor` or `pwsh/str_replace_editor`;
+  the next header carries the full Standard catalog.
 
 Run the local zero-dependency tests with:
 
