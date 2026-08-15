@@ -35,7 +35,7 @@ export const name = 'warmup-tool-bootstrap'
 /** Prompt assembly must exist before this plugin can narrow the catalog. */
 export const inject = ['systemPrompt']
 
-const DEFAULT_MESSAGE = 'Familiarize yourself with the repository this session works in, then give a brief summary of the project and any uncommitted changes or other notable state. Stay read-only.'
+const DEFAULT_MESSAGE = 'This round is a test. Tools are not open yet; all tools will open next round.'
 
 function stringList(value, field) {
   if (!Array.isArray(value) || value.length === 0 || value.some(item => typeof item !== 'string' || item.length === 0)) {

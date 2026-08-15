@@ -165,19 +165,23 @@ test('the warmup uses the default message when none is configured', async () => 
   const claimed = [{ role: 'user', content: [{ type: 'text', text: 'real request' }] }]
   arm(h, agent, claimed[0])
   const result = await preStep(h, agent, { messages: claimed })
-  assert.match(result.messages[0].content[0].text, /^Familiarize yourself with the repository/)
+  assert.equal(
+    result.messages[0].content[0].text,
+    'This round is a test. Tools are not open yet; all tools will open next round.',
+  )
 })
 
-test('the default warmup message carries only the goal, no tool guidance', async () => {
+test('the default warmup message names no specific tool or command', async () => {
   const h = harness()
   const agent = makeAgent({ calls: h.calls })
   const claimed = [{ role: 'user', content: [{ type: 'text', text: 'real request' }] }]
   arm(h, agent, claimed[0])
   const result = await preStep(h, agent, { messages: claimed })
   const text = result.messages[0].content[0].text
-  assert.ok(!text.includes('`'), 'message must not contain code spans or tool names')
-  assert.ok(!/\bpwd\b|\bgit\b/i.test(text), 'message must not name shell commands')
-  assert.ok(!/\brun\b|\bUse the available\b/i.test(text), 'message must not steer tool use')
+  assert.ok(!text.includes('`'), 'message must not contain code spans')
+  assert.ok(!/\bpwd\b|\bgit\b|\brun\b/i.test(text), 'message must not name shell commands')
+  assert.ok(!/\bbash\b|\bpwsh\b|\bstr_replace_editor\b|\bread\b/i.test(text), 'message must not name specific tools')
+  assert.ok(!/\buse the available\b/i.test(text), 'message must not steer tool use')
 })
 
 test('the route seed carries the agent provider and model', async () => {

@@ -28,8 +28,9 @@ DeepSeek V4 Pro 只有在 Minimal prompt 状态下才能达到能力上限。但
    Windows 为 `pwsh`）加 `str_replace_editor`——即真实 Minimal 会话携带的
    两件工具，名称、描述与 schema 完全一致。没有 AGENTS.md/CLAUDE.md 基线、
    没有 skill 目录、没有 skill 内容；
-3. 热身消息是单一的目标句：只读地熟悉仓库，并以项目状态的简短总结结尾；它不
-   点名任何工具或命令，尽量不干扰纯净的 Minimal 请求；
+3. 热身消息是一句纯粹的回合声明："This round is a test. Tools are not open
+   yet; all tools will open next round." 它不点名目标、工具或命令，尽量不干扰
+   纯净的 Minimal 请求；
 4. 热身回合与普通回合一样可见地记录在轨迹里；
 5. 真实的第一条提示随后按正常流程处理，带完整 Standard 目录。完整目录中的
    shell 是 Minimal 的持久 `bash`（名称、描述与 schema 完全一致；Windows 仍用
@@ -102,8 +103,8 @@ cp -R preset "$dsh_home/.agent-presets/pristine"
 
 ## 验证加载
 
-- 第一个可见的 assistant 回合就是热身回合：只使用 shell 和 `str_replace_editor`，
-  并以仓库摘要结尾；
+- 第一个可见的 assistant 回合就是热身回合：其回复只是一句简短确认，而不是对
+  用户提示的回答；
 - 导出 session JSONL，检查 `request/header`：第一份 header 应只有
   `bash/str_replace_editor` 或 `pwsh/str_replace_editor`；下一份 header 应包含
   完整 Standard 目录。

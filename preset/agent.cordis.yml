@@ -52,9 +52,9 @@
 # request/header carries ONLY the Minimal fixed system prompt and Minimal's
 # exact two tools (`bash` + `str_replace_editor`) — no AGENTS.md/CLAUDE.md
 # baseline, no skill catalog, no skill content. The `message` below is
-# deliberately a goal-only sentence: it names the requirement (familiarize
-# yourself, then summarize) without enumerating tools or commands, so the
-# message itself disturbs the pure Minimal request as little as possible. The
+# deliberately a bare round-framing sentence — "this round is a test, tools
+# open next round" — naming no goal, tool, or command, so the message itself
+# disturbs the pure Minimal request as little as possible. The
 # user's first prompt is deferred to the following turn, which is processed
 # normally (full catalog, all context); later prompts are unaffected.
 # Subagent sessions skip the warmup.
@@ -68,10 +68,7 @@
     shellTools: [bash, pwsh]
     commonTools: [str_replace_editor]
     subagents: false
-    message: >-
-      Familiarize yourself with the repository this session works in, then give
-      a brief summary of the project and any uncommitted changes or other
-      notable state. Stay read-only.
+    message: This round is a test. Tools are not open yet; all tools will open next round.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'

@@ -37,10 +37,10 @@ skills.
    — the exact two tools a real Minimal session presents, with identical
    names, descriptions, and schemas. No AGENTS.md/CLAUDE.md baseline, no
    skill catalog, no skill content.
-3. The warmup message is a single goal-only sentence: familiarize yourself
-   with the repository read-only and end with a short summary of the project
-   state. It names no tools or commands, so the message itself disturbs the
-   pure Minimal request as little as possible.
+3. The warmup message is a bare round-framing sentence: "This round is a
+   test. Tools are not open yet; all tools will open next round." It names no
+   goal, tool, or command, so the message itself disturbs the pure Minimal
+   request as little as possible.
 4. The warmup turn is visible in the trajectory like any other turn.
 5. The real first prompt is then processed normally with the full Standard
    catalog. The shell in the full catalog is Minimal's persistent `bash`
@@ -117,8 +117,8 @@ Fully restart DeepSeek Harness, create a blank session, and select
 
 ## Verify
 
-- The first visible assistant turn is the warmup: it uses only the shell and
-  `str_replace_editor` and ends with a repository summary.
+- The first visible assistant turn is the warmup: its reply is a short
+  acknowledgment, not an answer to the user's prompt.
 - Export the session JSONL and inspect `request/header` events: the first
   header carries only `bash/str_replace_editor` or `pwsh/str_replace_editor`;
   the next header carries the full Standard catalog.
