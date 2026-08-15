@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { apply, inject, name } from '../preset/warmup-bootstrap.mjs'
 
-const VALID_CONFIG = { shellTools: ['bash', 'pwsh'], commonTools: ['str_replace_editor'], subagents: false }
+const VALID_CONFIG = { subagents: false }
 
 function makeCalls() {
   return { warn: [], info: [], prepends: [], route: [] }
@@ -63,25 +63,13 @@ test('exports diagnostic plugin metadata', () => {
   assert.deepEqual(inject, ['systemPrompt'])
 })
 
-test('rejects invalid tool-list config', () => {
-  const ctx = { logger: { warn() {}, info() {} }, on() {} }
-  assert.throws(
-    () => apply(ctx, { ...VALID_CONFIG, shellTools: [] }),
-    /shellTools must be a non-empty array of non-empty strings/,
-  )
-  assert.throws(
-    () => apply(ctx, { ...VALID_CONFIG, commonTools: ['str_replace_editor', ''] }),
-    /commonTools must be a non-empty array of non-empty strings/,
-  )
-})
-
-test('a pending warmup narrows the catalog to Minimal\'s exact two tools', async () => {
+test('a pending warmup narrows the catalog to no tools', async () => {
   const h = harness()
   const agent = makeAgent({ calls: h.calls })
   arm(h, agent)
   const result = await assemble(h, agent, tools('bash', 'str_replace_editor', 'read', 'edit'))
   assert.equal(result.system, 'minimal persona')
-  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'str_replace_editor'])
+  assert.deepEqual(result.tools, [])
 })
 
 test('without a pending warmup the catalog stays complete', async () => {
@@ -89,24 +77,6 @@ test('without a pending warmup the catalog stays complete', async () => {
   const agent = makeAgent({ calls: h.calls })
   const result = await assemble(h, agent, tools('bash', 'read', 'edit'))
   assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'read', 'edit'])
-})
-
-test('two available shells fail soft to the full catalog', async () => {
-  const h = harness()
-  const agent = makeAgent({ calls: h.calls })
-  arm(h, agent)
-  const result = await assemble(h, agent, tools('bash', 'pwsh', 'read', 'edit'))
-  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'pwsh', 'read', 'edit'])
-  assert.equal(h.calls.warn.length, 1)
-})
-
-test('a missing common tool fails soft to the full catalog', async () => {
-  const h = harness()
-  const agent = makeAgent({ calls: h.calls })
-  arm(h, agent)
-  const result = await assemble(h, agent, tools('bash', 'edit'))
-  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'edit'])
-  assert.equal(h.calls.warn.length, 1)
 })
 
 test('subagent sessions do not arm the warmup by default', async () => {
@@ -123,7 +93,7 @@ test('subagents: true arms subagent sessions too', async () => {
   const agent = makeAgent({ calls: h.calls, origin: 'subagent' })
   arm(h, agent)
   const result = await assemble(h, agent, tools('bash', 'str_replace_editor', 'edit'))
-  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'str_replace_editor'])
+  assert.deepEqual(result.tools, [])
 })
 
 test('an insert without a message does not arm', async () => {

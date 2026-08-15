@@ -5,10 +5,9 @@
 # baselines and skill injections enter the first request and pollute that
 # state. The warmup listener replaces the first step's messages outermost on
 # the pre-step waterfall — ahead of the instruction and skill injections — so
-# that first request carries ONLY the fixed minimal prompt and Minimal's exact
-# two tools (`bash` + `str_replace_editor`, same names, descriptions, and
-# schemas as a real Minimal session), and the discarded injections never
-# reach it.
+# that first request carries ONLY the fixed minimal prompt and NO tools at
+# all (even purer than a real Minimal session, whose two tool schemas are not
+# part of this request), and the discarded injections never reach it.
 # After the warmup turn completes, the user's first prompt is processed
 # normally with the full Standard catalog.
 #
@@ -49,12 +48,11 @@
 #
 # The session's very first step becomes a WARMUP ROUND run by
 # `warmup-bootstrap.mjs` through the normal agent loop: that step's
-# request/header carries ONLY the Minimal fixed system prompt and Minimal's
-# exact two tools (`bash` + `str_replace_editor`) — no AGENTS.md/CLAUDE.md
-# baseline, no skill catalog, no skill content. The `message` below is
-# deliberately a bare round-framing sentence — "this round is a test, tools
-# open next round" — naming no goal, tool, or command, so the message itself
-# disturbs the pure Minimal request as little as possible. The
+# request/header carries ONLY the Minimal fixed system prompt and NO tools —
+# no AGENTS.md/CLAUDE.md baseline, no skill catalog, no skill content. The
+# `message` below is deliberately a bare round-framing sentence — "this round
+# is a test, tools open next round" — naming no goal, tool, or command, so the
+# message itself disturbs the pure Minimal request as little as possible. The
 # user's first prompt is deferred to the following turn, which is processed
 # normally (full catalog, all context); later prompts are unaffected.
 # Subagent sessions skip the warmup.
@@ -65,8 +63,6 @@
 - id: warmup-bootstrap
   name: ./warmup-bootstrap.mjs
   config:
-    shellTools: [bash, pwsh]
-    commonTools: [str_replace_editor]
     subagents: false
     message: This round is a test. Tools are not open yet; all tools will open next round.
 

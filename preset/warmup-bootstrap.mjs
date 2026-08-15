@@ -9,10 +9,9 @@
  *  1. When the first input of a fresh session is queued, the plugin arms a
  *     per-agent pending flag (`agent/inbox/inserted`).
  *  2. While pending, `system-prompt/assemble` narrows the assembled tool
- *     catalog to one native shell plus `str_replace_editor` — the exact two
- *     tools a real Minimal session presents — so the warmup step's
- *     request/header logs that catalog (the system prompt stays the Minimal
- *     fixed text under the `complete` persona).
+ *     catalog to NOTHING, so the warmup step's request/header logs a
+ *     tool-less request (the system prompt stays the Minimal fixed text
+ *     under the `complete` persona).
  *  3. On the first `agent/pre-step`, the claimed real input is moved back to
  *     the next-turn queue and the step's messages are replaced with one
  *     synthetic warmup message. The listener is registered with
@@ -21,7 +20,7 @@
  *     every downstream injection (baseline, skill catalog, skill content) is
  *     discarded with the replacement.
  *  4. The warmup turn runs through the normal loop: turn/step events, a
- *     request/header with the minimal system prompt and two tools, the model
+ *     request/header with the minimal system prompt and NO tools, the model
  *     stream, and an assistant message are all recorded in the trajectory.
  *     The real input is then processed in the following turn with the full
  *     catalog and all normal context.
@@ -37,16 +36,7 @@ export const inject = ['systemPrompt']
 
 const DEFAULT_MESSAGE = 'This round is a test. Tools are not open yet; all tools will open next round.'
 
-function stringList(value, field) {
-  if (!Array.isArray(value) || value.length === 0 || value.some(item => typeof item !== 'string' || item.length === 0)) {
-    throw new TypeError(`${name}: ${field} must be a non-empty array of non-empty strings`)
-  }
-  return [...new Set(value)]
-}
-
 export function apply(ctx, config) {
-  const shellTools = stringList(config.shellTools, 'shellTools')
-  const commonTools = stringList(config.commonTools, 'commonTools')
   const includeSubagents = config.subagents === true
   const message = typeof config.message === 'string' && config.message.length > 0 ? config.message : DEFAULT_MESSAGE
 
@@ -59,23 +49,15 @@ export function apply(ctx, config) {
     (includeSubagents || agent.session.header.meta?.origin !== 'subagent')
   )
 
-  // Narrow the assembled tool catalog while the warmup is pending, so the
-  // warmup step's request/header carries exactly the two tools below.
-  // `prepend` keeps this filter outermost on the waterfall, so no later
-  // listener can widen the catalog back before the request is built.
+  // Narrow the assembled tool catalog to NOTHING while the warmup is pending,
+  // so the warmup step's request/header logs a tool-less request. `prepend`
+  // keeps this filter outermost on the waterfall, so no later listener can
+  // widen the catalog back before the request is built.
   ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
     const assembled = await next()
     const agent = context.agent
     if (agent === undefined || !pending.has(agent) || !freshSession(agent)) return assembled
-    const available = new Set(assembled.tools.map(tool => tool.name))
-    const shells = shellTools.filter(toolName => available.has(toolName))
-    const missingCommon = commonTools.filter(toolName => !available.has(toolName))
-    if (shells.length !== 1 || missingCommon.length > 0) {
-      ctx.logger.warn('%s: cannot narrow the warmup catalog (shells=%o missing=%o); running with the full catalog', name, shells, missingCommon)
-      return assembled
-    }
-    const keep = new Set([shells[0], ...commonTools])
-    return { ...assembled, tools: assembled.tools.filter(tool => keep.has(tool.name)) }
+    return { ...assembled, tools: [] }
   }, { prepend: true })
 
   // Arm the warmup when the first input of a fresh session is queued. This

@@ -14,19 +14,17 @@ DeepSeek V4 Pro 只有在 Minimal prompt 状态下才能达到能力上限。但
 第一次请求里，"名义上的 Minimal"其实并不 Minimal，能力最大化随之失效。
 
 本 preset 从机制上保证了纯净。会话的第一个 step 会被替换成一个热身回合，其请求
-只携带固定的 Minimal system prompt 和 Minimal 的两项工具（`bash` 加
-`str_replace_editor`，名称、描述与 schema 与真实 Minimal 会话完全一致）；替换
-发生在 pre-step 瀑布的最外层，先于指令与 skill 注入执行，因此那些注入在这一请求
-中被直接丢弃，无法污染它。用户的真实第一条提示被推迟到下一回合，此后按正常流程
-处理：完整 Standard 目录、全部指令与 skills。
+只携带固定的 Minimal system prompt，且完全不携带任何工具——比真实 Minimal 会话
+还要纯粹（后者的两件工具 schema 也不出现在这一请求里）；替换发生在 pre-step
+瀑布的最外层，先于指令与 skill 注入执行，因此那些注入在这一请求中被直接丢弃，
+无法污染它。用户的真实第一条提示被推迟到下一回合，此后按正常流程处理：完整
+Standard 目录、全部指令与 skills。
 
 ## 它做什么
 
 1. 新会话收到第一次输入时，第一个 step 变成热身回合，而不是回答用户；
 2. 热身请求只包含 Minimal 固定 system prompt（`You are a helpful software
-   engineer assistant.`）和两项工具：一个本机 shell（Linux 为 `bash`，
-   Windows 为 `pwsh`）加 `str_replace_editor`——即真实 Minimal 会话携带的
-   两件工具，名称、描述与 schema 完全一致。没有 AGENTS.md/CLAUDE.md 基线、
+   engineer assistant.`），不含任何工具。没有 AGENTS.md/CLAUDE.md 基线、
    没有 skill 目录、没有 skill 内容；
 3. 热身消息是一句纯粹的回合声明："This round is a test. Tools are not open
    yet; all tools will open next round." 它不点名目标、工具或命令，尽量不干扰
@@ -105,9 +103,8 @@ cp -R preset "$dsh_home/.agent-presets/pristine"
 
 - 第一个可见的 assistant 回合就是热身回合：其回复只是一句简短确认，而不是对
   用户提示的回答；
-- 导出 session JSONL，检查 `request/header`：第一份 header 应只有
-  `bash/str_replace_editor` 或 `pwsh/str_replace_editor`；下一份 header 应包含
-  完整 Standard 目录。
+- 导出 session JSONL，检查 `request/header`：第一份 header 不应包含任何工具；
+  下一份 header 应包含完整 Standard 目录。
 
 本仓库的零依赖测试：
 
@@ -122,8 +119,8 @@ npm test
 - 热身消耗一个真实回合（及其 token），并可见地记录在轨迹中；
 - 已经记录过 `request/header` 的会话（resume/reload）不会再次热身；
 - 子代理会话跳过热身（preset 配置 `subagents: false`）；
-- 只有热身待执行时才缩窄目录；若配置的两个 shell 无法恰好留下一个（或缺少
-  通用工具），热身将带完整目录运行并记录警告；
+- 只有热身待执行时才缩窄目录：待执行期间目录被缩窄为零工具，下一回合恢复完整
+  目录；
 - preset 与 shell 访问具有相同信任等级，安装前应自行审阅文件；
 - 插件不会发起网络请求，也不增加遥测。
 

@@ -19,24 +19,20 @@ capability-maximizing state is lost.
 
 This preset holds the state by construction. The session's very first step is
 replaced with a warmup round whose request carries ONLY the fixed Minimal
-system prompt and Minimal's exact two tools (`bash` plus `str_replace_editor`,
-same names, descriptions, and schemas as a real Minimal session). The
-replacement runs outermost on the pre-step waterfall, ahead of the instruction
-and skill injections, so those injections are discarded for this request
-instead of polluting it. The user's first prompt is deferred to the next turn
-and is then processed normally: full Standard catalog, all instructions and
-skills.
+system prompt and NO tools at all — even purer than a real Minimal session,
+whose two tool schemas are absent from this request. The replacement runs
+outermost on the pre-step waterfall, ahead of the instruction and skill
+injections, so those injections are discarded for this request instead of
+polluting it. The user's first prompt is deferred to the next turn and is then
+processed normally: full Standard catalog, all instructions and skills.
 
 ## What it does
 
 1. On the first input of a fresh session, the first step becomes a warmup
    round instead of answering the user.
 2. The warmup request contains only the Minimal fixed system prompt
-   (`You are a helpful software engineer assistant.`) and two tools: one
-   native shell (`bash` on Linux, `pwsh` on Windows) plus `str_replace_editor`
-   — the exact two tools a real Minimal session presents, with identical
-   names, descriptions, and schemas. No AGENTS.md/CLAUDE.md baseline, no
-   skill catalog, no skill content.
+   (`You are a helpful software engineer assistant.`) and NO tools. No
+   AGENTS.md/CLAUDE.md baseline, no skill catalog, no skill content.
 3. The warmup message is a bare round-framing sentence: "This round is a
    test. Tools are not open yet; all tools will open next round." It names no
    goal, tool, or command, so the message itself disturbs the pure Minimal
@@ -120,8 +116,7 @@ Fully restart DeepSeek Harness, create a blank session, and select
 - The first visible assistant turn is the warmup: its reply is a short
   acknowledgment, not an answer to the user's prompt.
 - Export the session JSONL and inspect `request/header` events: the first
-  header carries only `bash/str_replace_editor` or `pwsh/str_replace_editor`;
-  the next header carries the full Standard catalog.
+  header carries NO tools; the next header carries the full Standard catalog.
 
 Run the local zero-dependency tests with:
 
@@ -139,9 +134,8 @@ npm test
 - Sessions that already recorded a `request/header` (resumed or reloaded
   sessions) do not warm up again.
 - Subagent sessions skip the warmup (`subagents: false` in the preset config).
-- The catalog is narrowed only while a warmup is pending. If exactly one of
-  the configured shells is not available (or a common tool is missing), the
-  warmup runs with the full catalog and logs a warning.
+- The catalog is narrowed only while a warmup is pending: while pending it is
+  narrowed to zero tools, and the following turn gets the full catalog back.
 - The preset has the same trust level as shell access. Review its files before
   installation.
 - The plugin performs no network requests and adds no telemetry.
