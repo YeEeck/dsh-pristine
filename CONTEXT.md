@@ -39,3 +39,33 @@ option decides whether delegated children participate in the warmup flow;
 external CLI subagents (codex, claude-code) are not agent sessions at all and
 are out of scope.
 _Avoid_: subagent (ambiguous between spawn and fork)
+
+**Windows shell selection**:
+The preset's choice of the model-facing Windows shell among `pwsh`,
+`git-bash`, and `wsl`. It is a configuration decision, not a runtime
+per-command choice; the session exposes exactly one shell.
+_Avoid_: Windows shell (ambiguous), shell mode
+
+**Git Bash**:
+A Windows-native bash environment (MSYS2-style) with Windows-style paths and
+no Linux kernel. It is distinct from WSL even though both present a `bash`
+prompt.
+_Avoid_: bash on Windows (ambiguous), Unix shell
+
+**WSL**:
+Windows Subsystem for Linux, a Linux environment with Linux paths and a
+selected default distribution. It is distinct from Git Bash even though both
+present a `bash` prompt.
+_Avoid_: bash on Windows (ambiguous), Linux mode
+
+**Persistent bash**:
+The model-facing shell that retains cwd, exported variables, functions, and
+background state across commands. On non-Windows it is the normal shell; on
+Windows it may be backed by Git Bash or WSL instead of the one-shot `pwsh`.
+_Avoid_: persistent shell (ambiguous), bash tool
+
+**Shell fallback**:
+The fail-soft behavior when a configured or default Windows bash variant is
+unavailable or the configuration value is invalid: the preset logs a warning
+and exposes `pwsh` instead, keeping the session usable.
+_Avoid_: fallback (ambiguous), error-out

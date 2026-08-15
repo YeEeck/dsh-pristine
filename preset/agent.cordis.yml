@@ -101,9 +101,11 @@
 # The PTY (`terminals`) registry is an agent-owned service, so it lives in an
 # entry-local realm, exactly as in Minimal.
 #
-# `tool-pwsh` remains as the Windows shell: Minimal's terminal-bash hardcodes
-# `/bin/bash`, so on win32 the persistent-shell group is disabled and pwsh
-# keeps a working shell. On Linux/macOS the catalog matches Minimal exactly.
+# On Windows the preset defaults to a persistent Git Bash shell, with WSL and
+# pwsh available as explicit choices. `tool-pwsh` remains registered as the
+# fallback and the explicit `pwsh` choice; the `windows-shell` plugin hides it
+# from the model-visible catalog while a bash variant is active. On Linux/macOS
+# the catalog matches Minimal exactly.
 - id: persistent-shell
   name: cordis:group
   group: true
@@ -136,6 +138,24 @@
 - id: tool-pwsh
   name: '@deepseek-ai/dsh-tool-pwsh'
   disabled: !!js process.platform !== 'win32'
+
+# Windows-only selection among persistent Git Bash, WSL, and one-shot pwsh.
+# The group carries the same entry-local `terminals` realm as the non-Windows
+# persistent shell so a dynamically mounted bash stack cannot collide with
+# another preset's PTY service.
+- id: windows-shell
+  name: cordis:group
+  group: true
+  disabled: !!js process.platform !== 'win32'
+  isolate:
+    terminals: true
+  config:
+    - id: windows-shell-bootstrap
+      name: ./windows-shell.mjs
+      config:
+        windowsShell: git-bash
+        gitBashPath: null
+        wslDistro: null
 
 # ── filesystem ──────────────────────────────────────────────────────────────
 

@@ -31,9 +31,9 @@ Standard 目录、全部指令与 skills。
    纯净的 Minimal 请求；
 4. 热身回合与普通回合一样可见地记录在轨迹里；
 5. 真实的第一条提示随后按正常流程处理，带完整 Standard 目录。完整目录中的
-   shell 是 Minimal 的持久 `bash`（名称、描述与 schema 完全一致；Windows 仍用
-   `pwsh`），`str_replace_editor` 加入 Standard 文件工具之列（`read`/`write`/
-   `edit`/`glob`/`grep` 保留）。
+   shell 是 Minimal 的持久 `bash`（名称、描述与 schema 完全一致）。Windows
+   默认使用 Git Bash，也支持 WSL 和 `pwsh` 作为显式选择；`str_replace_editor`
+   加入 Standard 文件工具之列（`read`/`write`/`edit`/`glob`/`grep` 保留）。
 
 子代理会话在全新启动时同样走热身流程。本 preset 暴露的委派后端是进程内
 `spawn` 子代理——`subagent` 工具、workflow 的 `agent()` 调用、ralph 的每一轮——
@@ -44,6 +44,28 @@ Standard 目录、全部指令与 skills。
 claude-code）不走 agent 循环，不在覆盖范围内。在 preset 配置里设
 `subagents: false` 可让所有被委派子代理都跳过热身——适合不想为每个子代理多付
 一轮 token 的批量 fan-out 场景。
+
+## Windows shell
+
+在 Windows 上，Pristine 默认使用由 Git Bash 支持的持久 `bash`。要切换 shell，
+请编辑已安装 preset 的 `agent.cordis.yml` 中 `windows-shell-bootstrap` 的配置：
+
+```yaml
+- id: windows-shell-bootstrap
+  name: ./windows-shell.mjs
+  config:
+    windowsShell: git-bash   # git-bash（默认）、wsl 或 pwsh
+    gitBashPath: null        # 可选：bash.exe 的绝对路径
+    wslDistro: null          # 可选：WSL 发行版名，例如 Ubuntu
+```
+
+- `git-bash` 会自动探测常见的 Git for Windows 安装位置；`gitBashPath` 可在
+  非标准安装时覆盖探测结果。
+- `wsl` 使用 `wsl.exe`；`wslDistro` 用于选择非默认发行版，且必须是 WSL 中
+  已安装的发行版。
+- 当 bash 变体激活时，模型可见目录只暴露 `bash`，并隐藏 `pwsh`。
+- 如果所选 bash 变体不可用或配置值非法，Pristine 会记录警告并回退到 `pwsh`，
+  保证会话仍然可用。
 
 ## 兼容范围
 
@@ -133,6 +155,8 @@ npm test
   纯 Minimal 状态；
 - 只有热身待执行时才缩窄目录：待执行期间目录被缩窄为零工具，下一回合恢复完整
   目录；
+- 在 Windows 上，所选 Git Bash/WSL shell 是失败安全的：如果缺失或配置错误，
+  会记录警告并回退到 `pwsh`；
 - preset 与 shell 访问具有相同信任等级，安装前应自行审阅文件；
 - 插件不会发起网络请求，也不增加遥测。
 

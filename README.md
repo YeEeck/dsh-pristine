@@ -40,8 +40,9 @@ processed normally: full Standard catalog, all instructions and skills.
 4. The warmup turn is visible in the trajectory like any other turn.
 5. The real first prompt is then processed normally with the full Standard
    catalog. The shell in the full catalog is Minimal's persistent `bash`
-   (identical name, description, and schema; `pwsh` remains the Windows
-   shell), and `str_replace_editor` joins the Standard file tools
+   (identical name, description, and schema). On Windows the default backend
+   is Git Bash, with WSL and `pwsh` available as explicit choices, and
+   `str_replace_editor` joins the Standard file tools
    (`read`/`write`/`edit`/`glob`/`grep` are kept).
 
 Subagent sessions run the same warmup when they start fresh. The delegation
@@ -56,6 +57,31 @@ up — harmless). External CLI subagents (codex, claude-code) do not run the
 agent loop and are not covered. Set `subagents: false` in the preset config to
 skip the warmup for every delegated child — useful for bulk fan-out that
 should not pay one extra turn per child.
+
+## Windows shell
+
+On Windows, Pristine defaults to a persistent `bash` backed by Git Bash. To
+choose a different shell, edit the installed preset's `agent.cordis.yml`
+under the `windows-shell-bootstrap` config:
+
+```yaml
+- id: windows-shell-bootstrap
+  name: ./windows-shell.mjs
+  config:
+    windowsShell: git-bash   # git-bash (default), wsl, or pwsh
+    gitBashPath: null        # optional absolute path to bash.exe
+    wslDistro: null          # optional WSL distro name, e.g. Ubuntu
+```
+
+- `git-bash` auto-detects common Git for Windows locations; `gitBashPath`
+  overrides detection when Git is installed somewhere non-standard.
+- `wsl` uses `wsl.exe`; `wslDistro` selects a non-default distribution and
+  must name a distro already installed in WSL.
+- While a bash variant is active, the model-visible catalog exposes only
+  `bash` and hides `pwsh`.
+- If the selected bash variant is unavailable or the configured value is
+  invalid, Pristine logs a warning and falls back to `pwsh` so the session
+  remains usable.
 
 ## Compatibility
 
@@ -151,6 +177,8 @@ npm test
   turns, so their first request cannot be pure Minimal.
 - The catalog is narrowed only while a warmup is pending: while pending it is
   narrowed to zero tools, and the following turn gets the full catalog back.
+- On Windows, the selected Git Bash/WSL shell is fail-soft: if it is missing
+  or misconfigured, the preset logs a warning and falls back to `pwsh`.
 - The preset has the same trust level as shell access. Review its files before
   installation.
 - The plugin performs no network requests and adds no telemetry.
