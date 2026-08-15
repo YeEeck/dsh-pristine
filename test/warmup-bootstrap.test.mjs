@@ -165,7 +165,19 @@ test('the warmup uses the default message when none is configured', async () => 
   const claimed = [{ role: 'user', content: [{ type: 'text', text: 'real request' }] }]
   arm(h, agent, claimed[0])
   const result = await preStep(h, agent, { messages: claimed })
-  assert.match(result.messages[0].content[0].text, /^Repository warm-up\./)
+  assert.match(result.messages[0].content[0].text, /^Familiarize yourself with the repository/)
+})
+
+test('the default warmup message carries only the goal, no tool guidance', async () => {
+  const h = harness()
+  const agent = makeAgent({ calls: h.calls })
+  const claimed = [{ role: 'user', content: [{ type: 'text', text: 'real request' }] }]
+  arm(h, agent, claimed[0])
+  const result = await preStep(h, agent, { messages: claimed })
+  const text = result.messages[0].content[0].text
+  assert.ok(!text.includes('`'), 'message must not contain code spans or tool names')
+  assert.ok(!/\bpwd\b|\bgit\b/i.test(text), 'message must not name shell commands')
+  assert.ok(!/\brun\b|\bUse the available\b/i.test(text), 'message must not steer tool use')
 })
 
 test('the route seed carries the agent provider and model', async () => {

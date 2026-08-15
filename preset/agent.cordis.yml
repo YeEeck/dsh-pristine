@@ -49,12 +49,12 @@
 # `warmup-bootstrap.mjs` through the normal agent loop: that step's
 # request/header carries ONLY the Minimal fixed system prompt and the two
 # tools below — no AGENTS.md/CLAUDE.md baseline, no skill catalog, no skill
-# content. The `message` below directs the agent to explore and summarize the
-# current repository state with those two tools (read-only), so the agent is
-# grounded in the repo before the first real request. The user's first prompt
-# is deferred to the following turn, which is processed normally (full
-# catalog, all context); later prompts are unaffected. Subagent sessions skip
-# the warmup.
+# content. The `message` below is deliberately a goal-only sentence: it names
+# the requirement (familiarize yourself, then summarize) without enumerating
+# tools or commands, so the message itself disturbs the pure Minimal request
+# as little as possible. The user's first prompt is deferred to the following
+# turn, which is processed normally (full catalog, all context); later
+# prompts are unaffected. Subagent sessions skip the warmup.
 #
 # This row MUST stay ahead of `agent-instructions`: the warmup listener
 # replaces the step's messages, and it has to run before the instruction and
@@ -66,13 +66,9 @@
     commonTools: [read]
     subagents: false
     message: >-
-      Repository warm-up. Use the available shell and read tools to familiarize
-      yourself with the repository this session works in: run `pwd`; when it is
-      a git repository, run `git status --short`, `git branch --show-current`,
-      and show the last few commits; list the top-level files; read the README
-      and any AGENTS.md/CLAUDE.md. Stay read-only: do not modify, create, or
-      delete anything. End your reply with a brief summary of what the project
-      is and any uncommitted changes or other notable state.
+      Familiarize yourself with the repository this session works in, then give
+      a brief summary of the project and any uncommitted changes or other
+      notable state. Stay read-only.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'

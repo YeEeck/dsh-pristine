@@ -33,9 +33,10 @@ processed normally: full Standard catalog, all instructions and skills.
    (`You are a helpful software engineer assistant.`) and two tools: one
    native shell (`bash` on Linux, `pwsh` on Windows) plus `read`. No
    AGENTS.md/CLAUDE.md baseline, no skill catalog, no skill content.
-3. The warmup message asks the agent to explore the repository read-only
-   (`pwd`, git status, recent commits, top-level files, README,
-   AGENTS.md/CLAUDE.md) and end with a short summary of the project state.
+3. The warmup message is a single goal-only sentence: familiarize yourself
+   with the repository read-only and end with a short summary of the project
+   state. It names no tools or commands, so the message itself disturbs the
+   pure Minimal request as little as possible.
 4. The warmup turn is visible in the trajectory like any other turn.
 5. The real first prompt is then processed normally with the full Standard
    catalog.

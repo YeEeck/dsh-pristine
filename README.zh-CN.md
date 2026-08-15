@@ -26,8 +26,8 @@ DeepSeek V4 Pro 只有在 Minimal prompt 状态下才能达到能力上限。但
    engineer assistant.`）和两项工具：一个本机 shell（Linux 为 `bash`，
    Windows 为 `pwsh`）加 `read`。没有 AGENTS.md/CLAUDE.md 基线、没有 skill
    目录、没有 skill 内容；
-3. 热身消息让 agent 只读地探查仓库（`pwd`、git status、最近提交、顶层文件、
-   README、AGENTS.md/CLAUDE.md），并在结尾给出项目状态的简短总结；
+3. 热身消息是单一的目标句：只读地熟悉仓库，并以项目状态的简短总结结尾；它不
+   点名任何工具或命令，尽量不干扰纯净的 Minimal 请求；
 4. 热身回合与普通回合一样可见地记录在轨迹里；
 5. 真实的第一条提示随后按正常流程处理，带完整 Standard 目录。
 

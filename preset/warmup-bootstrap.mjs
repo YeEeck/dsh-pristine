@@ -34,7 +34,7 @@ export const name = 'warmup-tool-bootstrap'
 /** Prompt assembly must exist before this plugin can narrow the catalog. */
 export const inject = ['systemPrompt']
 
-const DEFAULT_MESSAGE = 'Repository warm-up. Use the available shell and read tools to familiarize yourself with the repository this session works in: run `pwd`; when it is a git repository, run `git status --short`, `git branch --show-current`, and show the last few commits; list the top-level files; read the README and any AGENTS.md/CLAUDE.md. Stay read-only: do not modify, create, or delete anything. End your reply with a brief summary of what the project is and any uncommitted changes or other notable state.'
+const DEFAULT_MESSAGE = 'Familiarize yourself with the repository this session works in, then give a brief summary of the project and any uncommitted changes or other notable state. Stay read-only.'
 
 function stringList(value, field) {
   if (!Array.isArray(value) || value.length === 0 || value.some(item => typeof item !== 'string' || item.length === 0)) {
