@@ -25,6 +25,15 @@
  *     The real input is then processed in the following turn with the full
  *     catalog and all normal context.
  *
+ * Subagent sessions run the same warmup when they start fresh: in-process
+ * `spawn` children (the `subagent` tool, workflow `agent()` calls, ralph
+ * rounds) have an empty log and warm up like the main session. Fork children
+ * (`subagent_fork`) are seeded with the parent's completed turns, so their
+ * first request can never be pure Minimal; they are never warmed up. External
+ * CLI subagents (codex, claude-code) do not run the agent loop and are out of
+ * scope. `subagents: false` opts every delegated child out (e.g. bulk fan-out
+ * that should not pay one warmup turn per child).
+ *
  * Failure is fail-soft: a route that cannot resolve, a rejected step, or an
  * abort skips the warmup and the real input proceeds unchanged.
  */
@@ -43,11 +52,21 @@ export function apply(ctx, config) {
   /** Agents whose next assembly/pre-step must become the warmup round. */
   const pending = new WeakSet()
 
-  /** A session that has never logged a model request and is not a subagent. */
-  const freshSession = (agent) => (
-    !agent.session.events.some(event => event.type === 'request/header') &&
-    (includeSubagents || agent.session.header.meta?.origin !== 'subagent')
-  )
+  /**
+   * A session that has never logged a model request of its own and starts
+   * without inherited history. Fork children seed the parent's completed
+   * turns into their own log (`meta.seedLength` marks the boundary), so they
+   * are never fresh; spawn children start with an empty log and warm up like
+   * any fresh session unless `subagents: false` opts them out. A fork child
+   * spawned before its parent completed a turn has an empty seed and is
+   * indistinguishable from spawn — it warms up, which is harmless.
+   */
+  const freshSession = (agent) => {
+    const meta = agent.session.header.meta ?? {}
+    if ((meta.seedLength ?? 0) > 0) return false
+    if (!includeSubagents && meta.origin === 'subagent') return false
+    return !agent.session.events.some(event => event.type === 'request/header')
+  }
 
   // Narrow the assembled tool catalog to NOTHING while the warmup is pending,
   // so the warmup step's request/header logs a tool-less request. `prepend`

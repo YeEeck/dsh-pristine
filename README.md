@@ -44,7 +44,18 @@ processed normally: full Standard catalog, all instructions and skills.
    shell), and `str_replace_editor` joins the Standard file tools
    (`read`/`write`/`edit`/`glob`/`grep` are kept).
 
-Subagent sessions skip the warmup.
+Subagent sessions run the same warmup when they start fresh. The delegation
+backends this preset exposes are in-process `spawn` children — the `subagent`
+tool, workflow `agent()` calls, and ralph rounds — each a fresh session whose
+first request would otherwise carry the same baseline and skill injections, so
+each gets one warmup round too. Fork children (`subagent_fork`) are seeded
+with the parent's completed turns, so their first request can never be pure
+Minimal; they skip the warmup (a fork child spawned before its parent
+completed a turn has an empty seed, is indistinguishable from spawn, and warms
+up — harmless). External CLI subagents (codex, claude-code) do not run the
+agent loop and are not covered. Set `subagents: false` in the preset config to
+skip the warmup for every delegated child — useful for bulk fan-out that
+should not pay one extra turn per child.
 
 ## Compatibility
 
@@ -117,6 +128,8 @@ Fully restart DeepSeek Harness, create a blank session, and select
   acknowledgment, not an answer to the user's prompt.
 - Export the session JSONL and inspect `request/header` events: the first
   header carries NO tools; the next header carries the full Standard catalog.
+- Spawn a subagent (e.g. via the `subagent` tool) and export its session JSONL:
+  its first header also carries NO tools.
 
 Run the local zero-dependency tests with:
 
@@ -130,10 +143,12 @@ npm test
   step is rejected, or the run is aborted, the warmup is skipped and the real
   input proceeds unchanged.
 - The warmup consumes one real turn (and its tokens) and is visible in the
-  trajectory.
+  trajectory. Every fresh session pays it — the main session and each
+  spawn-backed subagent (`subagents: false` opts subagents out).
 - Sessions that already recorded a `request/header` (resumed or reloaded
   sessions) do not warm up again.
-- Subagent sessions skip the warmup (`subagents: false` in the preset config).
+- Fork subagent sessions skip the warmup: they inherit the parent's completed
+  turns, so their first request cannot be pure Minimal.
 - The catalog is narrowed only while a warmup is pending: while pending it is
   narrowed to zero tools, and the following turn gets the full catalog back.
 - The preset has the same trust level as shell access. Review its files before

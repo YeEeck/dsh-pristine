@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { apply, inject, name } from '../preset/warmup-bootstrap.mjs'
 
-const VALID_CONFIG = { subagents: false }
+const VALID_CONFIG = { subagents: true }
 
 function makeCalls() {
   return { warn: [], info: [], prepends: [], route: [] }
@@ -22,12 +22,17 @@ function harness(config = {}, calls = makeCalls()) {
   return { listeners, calls }
 }
 
-function makeAgent({ events = [], origin, provider = 'provider-x', model = 'model-y', calls, route } = {}) {
+function makeAgent({ events = [], origin, seedLength, provider = 'provider-x', model = 'model-y', calls, route } = {}) {
   return {
     options: { provider, model },
     session: {
       events,
-      header: { meta: origin === undefined ? {} : { origin } },
+      header: {
+        meta: {
+          ...(origin === undefined ? {} : { origin }),
+          ...(seedLength === undefined ? {} : { seedLength }),
+        },
+      },
     },
     dispatch: {
       waterfall: async (event, context, next) => {
@@ -79,8 +84,16 @@ test('without a pending warmup the catalog stays complete', async () => {
   assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'read', 'edit'])
 })
 
-test('subagent sessions do not arm the warmup by default', async () => {
+test('spawn subagent sessions arm the warmup by default', async () => {
   const h = harness()
+  const agent = makeAgent({ calls: h.calls, origin: 'subagent' })
+  arm(h, agent)
+  const result = await assemble(h, agent, tools('bash', 'str_replace_editor', 'edit'))
+  assert.deepEqual(result.tools, [])
+})
+
+test('subagents: false opts subagent sessions out', async () => {
+  const h = harness({ subagents: false })
   const agent = makeAgent({ calls: h.calls, origin: 'subagent' })
   arm(h, agent)
   const result = await assemble(h, agent, tools('bash', 'read', 'edit'))
@@ -88,8 +101,27 @@ test('subagent sessions do not arm the warmup by default', async () => {
   assert.equal(h.calls.warn.length, 0)
 })
 
-test('subagents: true arms subagent sessions too', async () => {
-  const h = harness({ subagents: true })
+test('fork children with inherited history never arm the warmup', async () => {
+  const h = harness()
+  const agent = makeAgent({
+    calls: h.calls,
+    origin: 'subagent',
+    seedLength: 5,
+    events: [{ type: 'request/header' }, { type: 'turn/start', data: { turn: 1 } }],
+  })
+  const claimed = [{ role: 'user', content: [{ type: 'text', text: 'delegated task' }] }]
+  arm(h, agent, claimed[0])
+  const result = await assemble(h, agent, tools('bash', 'read', 'edit'))
+  assert.deepEqual(result.tools.map(tool => tool.name), ['bash', 'read', 'edit'])
+  const decision = { kind: 'enter', messages: claimed }
+  const step = await preStep(h, agent, { messages: claimed, decision })
+  assert.deepEqual(step, decision)
+  assert.equal(h.calls.prepends.length, 0)
+  assert.equal(h.calls.warn.length, 0)
+})
+
+test('fork children with an empty seed warm up like spawn children', async () => {
+  const h = harness()
   const agent = makeAgent({ calls: h.calls, origin: 'subagent' })
   arm(h, agent)
   const result = await assemble(h, agent, tools('bash', 'str_replace_editor', 'edit'))

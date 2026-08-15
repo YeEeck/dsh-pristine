@@ -55,7 +55,23 @@
 # message itself disturbs the pure Minimal request as little as possible. The
 # user's first prompt is deferred to the following turn, which is processed
 # normally (full catalog, all context); later prompts are unaffected.
-# Subagent sessions skip the warmup.
+#
+# Subagent sessions run the same warmup when they start fresh. The delegation
+# backends this preset exposes are in-process `spawn` children — the `subagent`
+# tool, workflow `agent()` calls, and ralph rounds — each a fresh session whose
+# first request would otherwise carry the same baseline/skill injections, so it
+# gets one warmup round too. Fork children (`subagent_fork`) are seeded with
+# the parent's completed turns, so their first request can never be pure
+# Minimal; the plugin skips them (the inherited seed marks them as not fresh;
+# an empty seed is indistinguishable from spawn and warms up, which is
+# harmless). External CLI providers (codex, claude-code) do not run the agent
+# loop and are out of scope. `subagents: false` opts every delegated child out,
+# e.g. for bulk fan-out that should not pay one warmup turn per child.
+#
+# The tool-less warmup stays conflict-free with structured-output children only
+# while the `complete` persona collapses the system prompt to the fixed text:
+# a fork of this preset that drops `complete: true` would let the
+# structured-output instruction section reach the warmup round with no tools.
 #
 # This row MUST stay ahead of `agent-instructions`: the warmup listener
 # replaces the step's messages, and it has to run before the instruction and
@@ -63,7 +79,7 @@
 - id: warmup-bootstrap
   name: ./warmup-bootstrap.mjs
   config:
-    subagents: false
+    subagents: true
     message: This round is a test. Tools are not open yet; all tools will open next round.
 
 - id: agent-instructions

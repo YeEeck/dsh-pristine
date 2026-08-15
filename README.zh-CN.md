@@ -35,7 +35,15 @@ Standard 目录、全部指令与 skills。
    `pwsh`），`str_replace_editor` 加入 Standard 文件工具之列（`read`/`write`/
    `edit`/`glob`/`grep` 保留）。
 
-子代理会话跳过热身。
+子代理会话在全新启动时同样走热身流程。本 preset 暴露的委派后端是进程内
+`spawn` 子代理——`subagent` 工具、workflow 的 `agent()` 调用、ralph 的每一轮——
+每个都是全新会话，其首次请求同样会被基线与 skill 注入污染，因此各自也获得一个
+热身回合。fork 子代理（`subagent_fork`）的会话被种入父会话的已完成轮次，首次
+请求不可能达到纯 Minimal 状态，因此跳过热身（父会话尚无已完成轮次时派生的空
+种子 fork 与 spawn 无法区分，会顺带热身——无害）。外部 CLI 子代理（codex、
+claude-code）不走 agent 循环，不在覆盖范围内。在 preset 配置里设
+`subagents: false` 可让所有被委派子代理都跳过热身——适合不想为每个子代理多付
+一轮 token 的批量 fan-out 场景。
 
 ## 兼容范围
 
@@ -104,7 +112,9 @@ cp -R preset "$dsh_home/.agent-presets/pristine"
 - 第一个可见的 assistant 回合就是热身回合：其回复只是一句简短确认，而不是对
   用户提示的回答；
 - 导出 session JSONL，检查 `request/header`：第一份 header 不应包含任何工具；
-  下一份 header 应包含完整 Standard 目录。
+  下一份 header 应包含完整 Standard 目录；
+- 派生一个子代理（例如通过 `subagent` 工具）并导出其 session JSONL：它的第一份
+  header 同样不应包含任何工具。
 
 本仓库的零依赖测试：
 
@@ -116,9 +126,11 @@ npm test
 
 - 热身是失败安全的：模型路由无法解析、首个 step 被拒绝或运行被中止时，直接
   跳过热身，真实输入按原样处理；
-- 热身消耗一个真实回合（及其 token），并可见地记录在轨迹中；
+- 热身消耗一个真实回合（及其 token），并可见地记录在轨迹中。每个新会话都要付
+  这笔账——主会话和每个 spawn 子代理都是（`subagents: false` 可让子代理退出）；
 - 已经记录过 `request/header` 的会话（resume/reload）不会再次热身；
-- 子代理会话跳过热身（preset 配置 `subagents: false`）；
+- fork 子代理会话跳过热身：它们继承了父会话的已完成轮次，首次请求不可能达到
+  纯 Minimal 状态；
 - 只有热身待执行时才缩窄目录：待执行期间目录被缩窄为零工具，下一回合恢复完整
   目录；
 - preset 与 shell 访问具有相同信任等级，安装前应自行审阅文件；
