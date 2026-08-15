@@ -45,6 +45,31 @@ preset 是 Standard 组装的完整快照；升级 Harness 后，应先对照上
 
 ## 安装
 
+### 脚本安装
+
+Linux/macOS：
+
+```sh
+./install.sh           # 默认快照复制
+./install.sh --link    # 软链接 preset/，git pull 后立即生效
+```
+
+Windows（PowerShell）：
+
+```powershell
+.\install.ps1          # 默认快照复制
+.\install.ps1 -Link    # 软链接（需要开发者模式）
+```
+
+两个脚本都从 `DSH_HOME` 解析 preset 根目录（缺省回退到 `~/.dsh` 或
+`%USERPROFILE%\.dsh`），以 id `pristine` 安装，拒绝覆盖已有 preset，并校验安装
+结果；`--help` / `-Help` 可查看全部选项。若 PowerShell 执行策略拦截脚本，改用
+`powershell -ExecutionPolicy Bypass -File .\install.ps1`。
+
+卸载：`./uninstall.sh`（Linux/macOS）或 `.\uninstall.ps1`（Windows）。
+
+### 手动安装
+
 克隆本仓库，将整个 `preset` 目录复制到用户 preset 根目录，并将目标目录命名为
 `pristine`。
 
@@ -100,6 +125,15 @@ DeepSeek 当前建议社区作者把插件放在自己的 GitHub 项目中，并
 [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic 方便发现。官方仓库目前
 不接受外部 PR，也没有强制社区插件仓库模板。原文见官方
 [`CONTRIBUTING.zh.md`](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/CONTRIBUTING.zh.md)。
+
+## 鸣谢
+
+本 preset 的核心洞见——DeepSeek V4 Pro 仅在 Minimal prompt 状态下才能达到能力
+上限——来自
+[dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)。
+本 preset 在其基础之上补上了真实项目中的缺口：首个模型请求现在被保证为纯净的
+Minimal 状态，因为热身回合会丢弃 AGENTS.md/CLAUDE.md 基线与 skill 注入，使它们
+无法污染该请求。
 
 ## 许可证
 

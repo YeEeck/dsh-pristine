@@ -55,6 +55,33 @@ so review upstream changes before using it with a newer release.
 
 ## Install
 
+### Scripted install
+
+Linux/macOS:
+
+```sh
+./install.sh           # snapshot copy (default)
+./install.sh --link    # symlink preset/ so git pull updates apply immediately
+```
+
+Windows (PowerShell):
+
+```powershell
+.\install.ps1          # snapshot copy (default)
+.\install.ps1 -Link    # symlink (requires Developer Mode)
+```
+
+Both scripts resolve the preset root from `DSH_HOME` (falling back to `~/.dsh`
+or `%USERPROFILE%\.dsh`), install under the id `pristine`, refuse to overwrite
+an existing preset, and verify the installed files. Run with `--help` or
+`-Help` to list all options. If PowerShell's execution policy blocks the
+script, use `powershell -ExecutionPolicy Bypass -File .\install.ps1`.
+
+Remove the preset with `./uninstall.sh` (Linux/macOS) or `.\uninstall.ps1`
+(Windows).
+
+### Manual install
+
 Clone this repository, then copy the entire `preset` directory into the user
 preset root under the id `pristine`.
 
@@ -118,6 +145,16 @@ repository topic for discovery. The official repository does not currently
 accept external pull requests and does not mandate a community repository
 template. See the official
 [`CONTRIBUTING.md`](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/CONTRIBUTING.md).
+
+## Acknowledgments
+
+The core insight behind this preset — that DeepSeek V4 Pro reaches its
+capability ceiling only under the Minimal prompt state — comes from
+[dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard).
+This preset builds on that work and closes the gap it left on real projects:
+the first model request is now guaranteed pure Minimal, because
+AGENTS.md/CLAUDE.md baselines and skill injections are discarded from the
+warmup round instead of polluting it.
 
 ## License
 

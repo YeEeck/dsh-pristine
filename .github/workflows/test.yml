@@ -16,3 +16,36 @@ jobs:
         with:
           node-version: 24
       - run: npm test
+      - name: smoke-test install scripts
+        run: |
+          set -eu
+          export DSH_HOME="$RUNNER_TEMP/dsh"
+          ./install.sh
+          test -f "$DSH_HOME/.agent-presets/pristine/agent.cordis.yml"
+          ./uninstall.sh --yes
+          test ! -e "$DSH_HOME/.agent-presets/pristine"
+          ./install.sh --link
+          test -f "$DSH_HOME/.agent-presets/pristine/warmup-bootstrap.mjs"
+          ./uninstall.sh --yes
+          test ! -e "$DSH_HOME/.agent-presets/pristine"
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+      - name: smoke-test install scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:DSH_HOME = Join-Path $env:RUNNER_TEMP 'dsh'
+          .\install.ps1
+          if (-not (Test-Path -LiteralPath (Join-Path $env:DSH_HOME '.agent-presets\pristine\agent.cordis.yml'))) { throw 'install verification failed' }
+          .\uninstall.ps1 -Yes
+          if (Test-Path -LiteralPath (Join-Path $env:DSH_HOME '.agent-presets\pristine')) { throw 'uninstall failed' }
+          .\install.ps1 -Link
+          if (-not (Test-Path -LiteralPath (Join-Path $env:DSH_HOME '.agent-presets\pristine\warmup-bootstrap.mjs'))) { throw 'link install verification failed' }
+          .\uninstall.ps1 -Yes
