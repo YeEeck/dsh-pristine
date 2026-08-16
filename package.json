@@ -10,6 +10,6 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check preset/warmup-bootstrap.mjs && node --check preset/windows-shell.mjs && node --test"
+    "check": "node --check preset/warmup-bootstrap.mjs && node --check preset/windows-shell.mjs && node --check preset/windows-subprocess.mjs && node --test"
   }
 }

@@ -140,7 +140,15 @@ test('apply warns when a configured bash variant is unavailable', async () => {
 })
 
 test('apply imports harness packages through the owning preset entry tree', async () => {
+  class FakeSubprocessRuntime {
+    constructor(ctx, config) {
+      this.ctx = ctx
+      this.config = config
+      this.terminalInspector = undefined
+    }
+  }
   const modules = new Map([
+    ['@deepseek-ai/dsh-subprocess-local', FakeSubprocessRuntime],
     ['@deepseek-ai/dsh-terminal', { name: '@deepseek-ai/dsh-terminal', apply() {} }],
     ['@deepseek-ai/dsh-terminal-bash', { name: '@deepseek-ai/dsh-terminal-bash', apply() {} }],
     ['@deepseek-ai/dsh-tool-bash-persistent', { name: '@deepseek-ai/dsh-tool-bash-persistent', apply() {} }],
@@ -176,14 +184,15 @@ test('apply imports harness packages through the owning preset entry tree', asyn
   assert.equal(calls.loaderImports, 0)
   assert.equal(calls.warn.length, 0)
   assert.deepEqual(calls.plugins.map(entry => entry.name), [
+    'WindowsTerminalSubprocessRuntime',
     '@deepseek-ai/dsh-terminal',
     '@deepseek-ai/dsh-terminal-bash',
     '@deepseek-ai/dsh-tool-bash-persistent',
   ])
-  assert.equal(calls.plugins[1].config.backendType, 'git-bash')
-  assert.equal(calls.plugins[1].config.shellPath, process.cwd())
   assert.equal(calls.plugins[2].config.backendType, 'git-bash')
-  assert.match(calls.plugins[2].config.description, /Git Bash/)
+  assert.equal(calls.plugins[2].config.shellPath, process.cwd())
+  assert.equal(calls.plugins[3].config.backendType, 'git-bash')
+  assert.match(calls.plugins[3].config.description, /Git Bash/)
 
   const filter = calls.listeners['system-prompt/assemble']
   const assembled = await filter(undefined, {}, async () => ({

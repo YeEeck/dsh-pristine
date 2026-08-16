@@ -12,10 +12,15 @@
  * node_modules. The shell packages are imported lazily only when a bash
  * variant is actually selected, through the owning entry tree — the same
  * host-anchored resolution path the preset's own `@deepseek-ai/*` rows use.
+ * A scoped Windows subprocess runtime (`./windows-subprocess.mjs`) is mounted
+ * alongside them because the harness's local runtime has no win32 terminal
+ * inspector.
  */
 
 import { existsSync } from 'node:fs'
 import { win32 } from 'node:path'
+
+import { createWindowsTerminalSubprocessPlugin } from './windows-subprocess.mjs'
 
 const join = win32.join
 
@@ -170,10 +175,12 @@ export async function apply(ctx, config = {}) {
   if (hidePwsh) {
     try {
       const load = async (specifier) => ctx.loader.unwrapExports(await importHarnessModule(ctx, specifier))
+      const subprocessLocal = await load('@deepseek-ai/dsh-subprocess-local')
       const terminal = await load('@deepseek-ai/dsh-terminal')
       const terminalBash = await load('@deepseek-ai/dsh-terminal-bash')
       const toolBash = await load('@deepseek-ai/dsh-tool-bash-persistent')
 
+      await ctx.plugin(createWindowsTerminalSubprocessPlugin(subprocessLocal))
       await ctx.plugin(terminal)
       await ctx.plugin(terminalBash, {
         backendType: resolved.backendType,

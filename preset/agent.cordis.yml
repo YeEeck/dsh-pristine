@@ -142,13 +142,16 @@
 # Windows-only selection among persistent Git Bash, WSL, and one-shot pwsh.
 # The group carries the same entry-local `terminals` realm as the non-Windows
 # persistent shell so a dynamically mounted bash stack cannot collide with
-# another preset's PTY service.
+# another preset's PTY service. It also isolates `subprocess`: the mounted
+# Windows subprocess runtime patches terminal inspection for win32 while the
+# host provider remains untouched for pwsh and every other consumer.
 - id: windows-shell
   name: cordis:group
   group: true
   disabled: !!js process.platform !== 'win32'
   isolate:
     terminals: true
+    subprocess: true
   config:
     - id: windows-shell-bootstrap
       name: ./windows-shell.mjs

@@ -23,7 +23,7 @@ if (-not $env:USERPROFILE) { $env:USERPROFILE = [Environment]::GetFolderPath('Us
 $DshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
 $PresetRoot = Join-Path $DshHome '.agent-presets'
 $Target = Join-Path $PresetRoot $PresetId
-$PresetFiles = @('agent.cordis.yml', 'preset.yml', 'warmup-bootstrap.mjs', 'windows-shell.mjs')
+$PresetFiles = @('agent.cordis.yml', 'preset.yml', 'warmup-bootstrap.mjs', 'windows-shell.mjs', 'windows-subprocess.mjs')
 
 if ($Help) {
     Write-Host @"
