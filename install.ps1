@@ -23,6 +23,7 @@ if (-not $env:USERPROFILE) { $env:USERPROFILE = [Environment]::GetFolderPath('Us
 $DshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFILE '.dsh' }
 $PresetRoot = Join-Path $DshHome '.agent-presets'
 $Target = Join-Path $PresetRoot $PresetId
+$PresetFiles = @('agent.cordis.yml', 'preset.yml', 'warmup-bootstrap.mjs', 'windows-shell.mjs')
 
 if ($Help) {
     Write-Host @"
@@ -53,7 +54,7 @@ function Test-PresetEntry([string]$Path) {
 }
 
 function Test-SameFiles([string]$A, [string]$B) {
-    foreach ($Name in 'agent.cordis.yml', 'preset.yml', 'warmup-bootstrap.mjs') {
+    foreach ($Name in $PresetFiles) {
         $HashA = (Get-FileHash -LiteralPath (Join-Path $A $Name) -Algorithm MD5).Hash
         $HashB = (Get-FileHash -LiteralPath (Join-Path $B $Name) -Algorithm MD5).Hash
         if ($HashA -ne $HashB) { return $false }
@@ -85,7 +86,7 @@ if ($Link) {
     $Mode = 'copy'
 }
 
-foreach ($File in 'agent.cordis.yml', 'preset.yml', 'warmup-bootstrap.mjs') {
+foreach ($File in $PresetFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $Target $File))) {
         Write-Error "verification failed: $File missing after install"
     }

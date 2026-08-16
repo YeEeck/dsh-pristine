@@ -9,8 +9,9 @@
  *
  * The plugin intentionally has no top-level `@deepseek-ai/*` imports: preset
  * plugin files live under the user's home and cannot resolve the harness's
- * node_modules. The shell packages are imported lazily through `ctx.loader`
- * only when a bash variant is actually selected.
+ * node_modules. The shell packages are imported lazily only when a bash
+ * variant is actually selected, through the owning entry tree — the same
+ * host-anchored resolution path the preset's own `@deepseek-ai/*` rows use.
  */
 
 import { existsSync } from 'node:fs'
@@ -118,6 +119,26 @@ export function resolveWindowsShell(config = {}, env = process.env, exists = exi
 }
 
 /**
+ * Import a harness package through the loader tree that owns this plugin.
+ *
+ * `ctx.loader.import()` would be wrong here: `ctx.loader` is the ROOT loader
+ * traced to the calling context, so a bare specifier resolves from this
+ * plugin's `ctx.baseUrl` — the preset directory under the user's home, where
+ * the harness's node_modules is unreachable. The owning entry's tree is the
+ * preset include tree, whose `import()` resolves bare specifiers from the
+ * host base recorded at mount time (the same path every `@deepseek-ai/*`
+ * row in `agent.cordis.yml` uses). Falls back to `ctx.loader.import()` for
+ * non-entry contexts such as unit tests.
+ */
+function importHarnessModule(ctx, specifier) {
+  const entryTree = ctx.fiber?.entry?.parent?.tree
+  if (entryTree && typeof entryTree.import === 'function') {
+    return entryTree.import(specifier)
+  }
+  return ctx.loader.import(specifier)
+}
+
+/**
  * Build the system-prompt assembly filter that hides `pwsh` while a bash
  * variant is the active Windows shell.
  */
@@ -148,7 +169,7 @@ export async function apply(ctx, config = {}) {
 
   if (hidePwsh) {
     try {
-      const load = async (specifier) => ctx.loader.unwrapExports(await ctx.loader.import(specifier))
+      const load = async (specifier) => ctx.loader.unwrapExports(await importHarnessModule(ctx, specifier))
       const terminal = await load('@deepseek-ai/dsh-terminal')
       const terminalBash = await load('@deepseek-ai/dsh-terminal-bash')
       const toolBash = await load('@deepseek-ai/dsh-tool-bash-persistent')

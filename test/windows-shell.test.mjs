@@ -139,6 +139,59 @@ test('apply warns when a configured bash variant is unavailable', async () => {
   assert.equal(typeof calls.listeners['system-prompt/assemble'], 'function')
 })
 
+test('apply imports harness packages through the owning preset entry tree', async () => {
+  const modules = new Map([
+    ['@deepseek-ai/dsh-terminal', { name: '@deepseek-ai/dsh-terminal', apply() {} }],
+    ['@deepseek-ai/dsh-terminal-bash', { name: '@deepseek-ai/dsh-terminal-bash', apply() {} }],
+    ['@deepseek-ai/dsh-tool-bash-persistent', { name: '@deepseek-ai/dsh-tool-bash-persistent', apply() {} }],
+  ])
+  const calls = { warn: [], plugins: [], listeners: {}, loaderImports: 0 }
+  const ctx = {
+    logger: { warn: (...args) => calls.warn.push(args) },
+    on: (event, callback) => { calls.listeners[event] = callback },
+    plugin: (plugin, config) => {
+      calls.plugins.push({ name: plugin.name, config })
+      return {}
+    },
+    loader: {
+      import: async () => {
+        calls.loaderImports += 1
+        throw new Error('root loader import must not be used from a preset entry')
+      },
+      unwrapExports: (exports) => exports,
+    },
+    fiber: {
+      entry: {
+        parent: {
+          tree: {
+            import: async (specifier) => modules.get(specifier),
+          },
+        },
+      },
+    },
+  }
+
+  await apply(ctx, { windowsShell: 'git-bash', gitBashPath: process.cwd() })
+
+  assert.equal(calls.loaderImports, 0)
+  assert.equal(calls.warn.length, 0)
+  assert.deepEqual(calls.plugins.map(entry => entry.name), [
+    '@deepseek-ai/dsh-terminal',
+    '@deepseek-ai/dsh-terminal-bash',
+    '@deepseek-ai/dsh-tool-bash-persistent',
+  ])
+  assert.equal(calls.plugins[1].config.backendType, 'git-bash')
+  assert.equal(calls.plugins[1].config.shellPath, process.cwd())
+  assert.equal(calls.plugins[2].config.backendType, 'git-bash')
+  assert.match(calls.plugins[2].config.description, /Git Bash/)
+
+  const filter = calls.listeners['system-prompt/assemble']
+  const assembled = await filter(undefined, {}, async () => ({
+    tools: [{ name: 'bash' }, { name: 'pwsh' }, { name: 'read' }],
+  }))
+  assert.deepEqual(assembled.tools.map(tool => tool.name), ['bash', 'read'])
+})
+
 test('apply falls back to pwsh when mounting the bash stack fails', async () => {
   const calls = { warn: [], listeners: {} }
   const ctx = {
