@@ -3,9 +3,34 @@
 [English](./README.md)
 
 一个 DeepSeek Harness agent preset：保证每个新会话的第一个模型请求运行在纯净的
-Minimal prompt 状态下，之后再把真实请求按完整 Standard 目录正常处理。
+Minimal prompt 状态下——零工具、无基线或 skill 注入——之后再把真实请求按完整
+Standard 目录正常处理。
 
 这是社区项目，并非 DeepSeek 官方 preset，也不代表 DeepSeek 的认可或背书。
+
+## 主要特性
+
+- **机制上保证纯净 Minimal 首请求。** 会话的第一个 step 会被替换成一个可见的热身
+  回合，请求只携带固定的 Minimal system prompt（`You are a helpful software
+  engineer assistant.`）且不含任何工具。AGENTS.md/CLAUDE.md 基线、skill 目录与
+  skill 内容都不会进入该请求。
+- **零工具热身。** 比真实 Minimal 会话更纯粹：Minimal 通常随附的两个工具 schema
+  也不会出现在热身请求中。
+- **注入屏蔽。** 替换发生在 pre-step 瀑布的最外层，先于指令与 skill 注入执行，
+  因此这些注入会在热身请求中被直接丢弃，而不是污染它。
+- **热身后恢复正常流程。** 用户的真实第一条提示推迟一个回合，随后以完整 Standard
+  目录、全部指令与全部 skills 正常处理。
+- **Minimal 的 shell 与编辑器栈。** 完整目录暴露 Minimal 的持久 `bash`（名称、
+  描述与 schema 完全一致）与 `str_replace_editor`，同时保留 Standard 文件工具
+  （`read`/`write`/`edit`/`glob`/`grep`）。
+- **Windows shell 可选。** Windows 上默认使用持久 Git Bash（Git Bash 需要
+  **Full access** 完整访问状态），也支持显式选择 WSL 或 `pwsh`；不可用时安全
+  回退到 `pwsh`。
+- **子代理覆盖。** spawn 子代理与主会话一样热身，fork 子代理跳过；
+  `subagents: false` 可让所有被委派子代理退出。
+- **失败安全且幂等。** 模型路由无法解析、首个 step 被拒绝或运行被中止时跳过热身；
+  恢复或重新加载的会话不会再次热身。
+- **无网络、无遥测。** 插件不发起任何网络请求，也不增加任何遥测。
 
 ## 为什么这样做
 
@@ -20,35 +45,53 @@ DeepSeek V4 Pro 只有在 Minimal prompt 状态下才能达到能力上限。但
 无法污染它。用户的真实第一条提示被推迟到下一回合，此后按正常流程处理：完整
 Standard 目录、全部指令与 skills。
 
-## 它做什么
+## 工作方式
 
-1. 新会话收到第一次输入时，第一个 step 变成热身回合，而不是回答用户；
-2. 热身请求只包含 Minimal 固定 system prompt（`You are a helpful software
+1. 新会话收到第一次输入时，第一个 step 变成热身回合，而不是回答用户。
+2. 替换运行在 pre-step 瀑布的最外层，先于指令与 skill 注入执行，因此这些注入
+   会在热身请求中被直接丢弃，而不是污染它。
+3. 热身请求只包含 Minimal 固定 system prompt（`You are a helpful software
    engineer assistant.`），不含任何工具。没有 AGENTS.md/CLAUDE.md 基线、
-   没有 skill 目录、没有 skill 内容；
-3. 热身消息是一句纯粹的回合声明："This round is a test. Tools are not open
+   没有 skill 目录、没有 skill 内容。
+4. 热身消息是一句纯粹的回合声明："This round is a test. Tools are not open
    yet; all tools will open next round." 它不点名目标、工具或命令，尽量不干扰
-   纯净的 Minimal 请求；
-4. 热身回合与普通回合一样可见地记录在轨迹里；
-5. 真实的第一条提示随后按正常流程处理，带完整 Standard 目录。完整目录中的
+   纯净的 Minimal 请求。
+5. 热身回合与普通回合一样可见地记录在轨迹里。
+6. 真实的第一条提示随后按正常流程处理，带完整 Standard 目录。完整目录中的
    shell 是 Minimal 的持久 `bash`（名称、描述与 schema 完全一致）。Windows
    默认使用 Git Bash，也支持 WSL 和 `pwsh` 作为显式选择；`str_replace_editor`
    加入 Standard 文件工具之列（`read`/`write`/`edit`/`glob`/`grep` 保留）。
 
-子代理会话在全新启动时同样走热身流程。本 preset 暴露的委派后端是进程内
-`spawn` 子代理——`subagent` 工具、workflow 的 `agent()` 调用、ralph 的每一轮——
-每个都是全新会话，其首次请求同样会被基线与 skill 注入污染，因此各自也获得一个
-热身回合。fork 子代理（`subagent_fork`）的会话被种入父会话的已完成轮次，首次
-请求不可能达到纯 Minimal 状态，因此跳过热身（父会话尚无已完成轮次时派生的空
-种子 fork 与 spawn 无法区分，会顺带热身——无害）。外部 CLI 子代理（codex、
-claude-code）不走 agent 循环，不在覆盖范围内。在 preset 配置里设
-`subagents: false` 可让所有被委派子代理都跳过热身——适合不想为每个子代理多付
-一轮 token 的批量 fan-out 场景。
+## 热身覆盖范围
 
-## Windows shell
+| 会话类型 | 是否热身 | 原因 |
+| --- | --- | --- |
+| 主新会话 | 是 | 其首次请求原本会携带基线与 skill 注入。 |
+| spawn 子代理（`subagent` 工具、workflow 的 `agent()` 调用、ralph 各轮） | 是 | 每个都从空日志启动，面对同样的注入。 |
+| fork 子代理（`subagent_fork`） | 否 | 它继承父会话的已完成轮次，首次请求不可能达到纯 Minimal 状态。空种子的 fork 与 spawn 无法区分，会顺带热身——无害。 |
+| 恢复或重新加载的会话 | 否 | 已经记录过 `request/header`。 |
+| 外部 CLI 子代理（codex、claude-code） | 不覆盖 | 它不走 agent 循环。 |
 
-在 Windows 上，Pristine 默认使用由 Git Bash 支持的持久 `bash`。要切换 shell，
-请编辑已安装 preset 的 `agent.cordis.yml` 中 `windows-shell-bootstrap` 的配置：
+## 配置
+
+### 被委派会话
+
+spawn 子代理默认启用热身。要让所有被委派子代理都跳过热身——适合不想为每个子代理
+多付一轮 token 的批量 fan-out 场景——请编辑已安装 preset 的 `agent.cordis.yml`：
+
+```yaml
+- id: warmup-bootstrap
+  name: ./warmup-bootstrap.mjs
+  config:
+    subagents: false
+```
+
+### Windows shell
+
+在 Windows 上，Pristine 默认使用由 Git Bash 支持的持久 `bash`。Git Bash 只有在
+会话处于 **Full access**（完整访问）状态时才会生效——使用默认 shell 前，请先把
+会话切换到 Full access。要切换 shell，请编辑已安装 preset 的 `agent.cordis.yml`
+中 `windows-shell-bootstrap` 的配置：
 
 ```yaml
 - id: windows-shell-bootstrap
@@ -97,11 +140,14 @@ Windows（PowerShell）：
 ```
 
 两个脚本都从 `DSH_HOME` 解析 preset 根目录（缺省回退到 `~/.dsh` 或
-`%USERPROFILE%\.dsh`），以 id `pristine` 安装，拒绝覆盖已有 preset，并校验安装
-结果；`--help` / `-Help` 可查看全部选项。若 PowerShell 执行策略拦截脚本，改用
-`powershell -ExecutionPolicy Bypass -File .\install.ps1`。
+`%USERPROFILE%\.dsh`），以 id `pristine` 安装，不覆盖已有安装（内容完全一致时会
+报告已安装），并校验安装结果；`--help` / `-Help` 可查看全部选项。若 PowerShell
+执行策略拦截脚本，改用 `powershell -ExecutionPolicy Bypass -File .\install.ps1`。
 
-卸载：`./uninstall.sh`（Linux/macOS）或 `.\uninstall.ps1`（Windows）。
+### 卸载
+
+使用 `./uninstall.sh`（Linux/macOS）或 `.\uninstall.ps1`（Windows）卸载。两个
+脚本都会要求确认；`--yes` / `-Yes` 可跳过确认。
 
 ### 手动安装
 
@@ -126,6 +172,8 @@ test ! -e "$dsh_home/.agent-presets/pristine"
 cp -R preset "$dsh_home/.agent-presets/pristine"
 ```
 
+### 安装后
+
 完整重启 DeepSeek Harness，新建空 session，选择 **Pristine**。不要在已经产生
 内容的会话中途切换 preset。
 
@@ -144,21 +192,21 @@ cp -R preset "$dsh_home/.agent-presets/pristine"
 npm test
 ```
 
-## 重要行为
+## 行为说明
 
-- 热身是失败安全的：模型路由无法解析、首个 step 被拒绝或运行被中止时，直接
-  跳过热身，真实输入按原样处理；
-- 热身消耗一个真实回合（及其 token），并可见地记录在轨迹中。每个新会话都要付
-  这笔账——主会话和每个 spawn 子代理都是（`subagents: false` 可让子代理退出）；
-- 已经记录过 `request/header` 的会话（resume/reload）不会再次热身；
-- fork 子代理会话跳过热身：它们继承了父会话的已完成轮次，首次请求不可能达到
-  纯 Minimal 状态；
-- 只有热身待执行时才缩窄目录：待执行期间目录被缩窄为零工具，下一回合恢复完整
-  目录；
-- 在 Windows 上，所选 Git Bash/WSL shell 是失败安全的：如果缺失或配置错误，
-  会记录警告并回退到 `pwsh`；
-- preset 与 shell 访问具有相同信任等级，安装前应自行审阅文件；
-- 插件不会发起网络请求，也不增加遥测。
+- **失败处理。** 热身是失败安全的：模型路由无法解析、首个 step 被拒绝或运行被
+  中止时，直接跳过热身，真实输入按原样处理。
+- **成本与可见性。** 热身消耗一个真实回合（及其 token），并可见地记录在轨迹中。
+  每个新会话都要付这笔账——主会话和每个 spawn 子代理都是（`subagents: false`
+  可让子代理退出）。
+- **每个新会话只热身一次。** 已经记录过 `request/header` 的会话（resume/reload）
+  不会再次热身。
+- **目录缩窄范围。** 只有热身待执行时才缩窄目录：待执行期间目录被缩窄为零工具，
+  下一回合恢复完整目录。
+- **Windows 回退。** 在 Windows 上，所选 Git Bash/WSL shell 是失败安全的：如果
+  缺失或配置错误，会记录警告并回退到 `pwsh`。
+- **信任等级。** preset 与 shell 访问具有相同信任等级，安装前应自行审阅文件。
+- **隐私。** 插件不会发起网络请求，也不增加遥测。
 
 ## 官方生态要求
 

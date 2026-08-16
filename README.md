@@ -3,11 +3,42 @@
 [中文说明](./README.zh-CN.md)
 
 A DeepSeek Harness agent preset that guarantees the first model request of
-every fresh session runs in a pure Minimal prompt state, then processes the
-real prompt normally with the full Standard catalog.
+every fresh session runs in a pure Minimal prompt state — zero tools, no
+baseline or skill injections — then processes the real prompt normally with
+the full Standard catalog.
 
 This is a community project. It is not an official DeepSeek preset and is not
 affiliated with or endorsed by DeepSeek.
+
+## Features
+
+- **Pure Minimal first request, by construction.** The session's first step is
+  replaced with a visible warmup round that carries only the fixed Minimal
+  system prompt (`You are a helpful software engineer assistant.`) and NO
+  tools. AGENTS.md/CLAUDE.md baselines, the skill catalog, and skill content
+  never reach that request.
+- **Zero-tool warmup.** Even purer than a real Minimal session: the two tool
+  schemas that Minimal normally ships are absent from the warmup request.
+- **Injection shield.** The replacement runs outermost on the pre-step
+  waterfall, ahead of the instruction and skill injections, so those
+  injections are discarded for the warmup request instead of polluting it.
+- **Normal flow afterwards.** The user's real first prompt is deferred by one
+  turn and is then processed normally with the full Standard catalog, all
+  instructions, and all skills.
+- **Minimal shell and editor stack.** The full catalog exposes Minimal's
+  persistent `bash` (identical name, description, and schema) and
+  `str_replace_editor`, while keeping the Standard file tools
+  (`read`/`write`/`edit`/`glob`/`grep`).
+- **Windows shell choice.** On Windows, persistent Git Bash is the default
+  (Git Bash requires **Full access** mode), with WSL and `pwsh` as explicit
+  choices and a fail-soft fallback to `pwsh`.
+- **Subagent coverage.** Spawn-backed children warm up like the main session;
+  fork children skip; `subagents: false` opts all delegated children out.
+- **Fail-soft and idempotent.** If the model route cannot be resolved, the
+  first step is rejected, or the run is aborted, the warmup is skipped.
+  Resumed or reloaded sessions never warm up again.
+- **Offline and telemetry-free.** The plugin performs no network requests and
+  adds no telemetry.
 
 ## Why
 
@@ -26,43 +57,60 @@ injections, so those injections are discarded for this request instead of
 polluting it. The user's first prompt is deferred to the next turn and is then
 processed normally: full Standard catalog, all instructions and skills.
 
-## What it does
+## How it works
 
 1. On the first input of a fresh session, the first step becomes a warmup
    round instead of answering the user.
-2. The warmup request contains only the Minimal fixed system prompt
+2. The replacement runs outermost on the pre-step waterfall, ahead of the
+   instruction and skill injections, so those injections are discarded for
+   this request instead of polluting it.
+3. The warmup request contains only the Minimal fixed system prompt
    (`You are a helpful software engineer assistant.`) and NO tools. No
    AGENTS.md/CLAUDE.md baseline, no skill catalog, no skill content.
-3. The warmup message is a bare round-framing sentence: "This round is a
+4. The warmup message is a bare round-framing sentence: "This round is a
    test. Tools are not open yet; all tools will open next round." It names no
    goal, tool, or command, so the message itself disturbs the pure Minimal
    request as little as possible.
-4. The warmup turn is visible in the trajectory like any other turn.
-5. The real first prompt is then processed normally with the full Standard
+5. The warmup turn is visible in the trajectory like any other turn.
+6. The real first prompt is then processed normally with the full Standard
    catalog. The shell in the full catalog is Minimal's persistent `bash`
    (identical name, description, and schema). On Windows the default backend
    is Git Bash, with WSL and `pwsh` available as explicit choices, and
    `str_replace_editor` joins the Standard file tools
    (`read`/`write`/`edit`/`glob`/`grep` are kept).
 
-Subagent sessions run the same warmup when they start fresh. The delegation
-backends this preset exposes are in-process `spawn` children — the `subagent`
-tool, workflow `agent()` calls, and ralph rounds — each a fresh session whose
-first request would otherwise carry the same baseline and skill injections, so
-each gets one warmup round too. Fork children (`subagent_fork`) are seeded
-with the parent's completed turns, so their first request can never be pure
-Minimal; they skip the warmup (a fork child spawned before its parent
-completed a turn has an empty seed, is indistinguishable from spawn, and warms
-up — harmless). External CLI subagents (codex, claude-code) do not run the
-agent loop and are not covered. Set `subagents: false` in the preset config to
-skip the warmup for every delegated child — useful for bulk fan-out that
-should not pay one extra turn per child.
+## Warmup coverage
 
-## Windows shell
+| Session | Warmup? | Why |
+| --- | --- | --- |
+| Main fresh session | Yes | Its first request would otherwise carry the baseline and skill injections. |
+| Spawn child (`subagent` tool, workflow `agent()` calls, ralph rounds) | Yes | Each starts from an empty log and faces the same injections. |
+| Fork child (`subagent_fork`) | No | It inherits the parent's completed turns, so its first request can never be pure Minimal. A fork child with an empty seed is indistinguishable from spawn and warms up — harmless. |
+| Resumed or reloaded session | No | It has already recorded a `request/header`. |
+| External CLI subagent (codex, claude-code) | Not covered | It does not run the agent loop. |
 
-On Windows, Pristine defaults to a persistent `bash` backed by Git Bash. To
-choose a different shell, edit the installed preset's `agent.cordis.yml`
-under the `windows-shell-bootstrap` config:
+## Configuration
+
+### Delegated sessions
+
+The warmup is enabled by default for spawn-backed children. To skip it for
+every delegated child — useful for bulk fan-out that should not pay one extra
+turn per child — edit the installed preset's `agent.cordis.yml`:
+
+```yaml
+- id: warmup-bootstrap
+  name: ./warmup-bootstrap.mjs
+  config:
+    subagents: false
+```
+
+### Windows shell
+
+On Windows, Pristine defaults to a persistent `bash` backed by Git Bash. Git
+Bash only takes effect while the session is in **Full access** mode — switch
+the session to Full access before relying on the default shell. To choose a
+different shell, edit the installed preset's `agent.cordis.yml` under the
+`windows-shell-bootstrap` config:
 
 ```yaml
 - id: windows-shell-bootstrap
@@ -114,13 +162,17 @@ Windows (PowerShell):
 ```
 
 Both scripts resolve the preset root from `DSH_HOME` (falling back to `~/.dsh`
-or `%USERPROFILE%\.dsh`), install under the id `pristine`, refuse to overwrite
-an existing preset, and verify the installed files. Run with `--help` or
-`-Help` to list all options. If PowerShell's execution policy blocks the
-script, use `powershell -ExecutionPolicy Bypass -File .\install.ps1`.
+or `%USERPROFILE%\.dsh`), install under the id `pristine`, leave an existing
+installation untouched (an identical install is reported as already installed),
+and verify the installed files. Run with `--help` or `-Help` to list all
+options. If PowerShell's execution policy blocks the script, use
+`powershell -ExecutionPolicy Bypass -File .\install.ps1`.
+
+### Uninstall
 
 Remove the preset with `./uninstall.sh` (Linux/macOS) or `.\uninstall.ps1`
-(Windows).
+(Windows). Both scripts prompt for confirmation; use `--yes` or `-Yes` to skip
+the prompt.
 
 ### Manual install
 
@@ -145,6 +197,8 @@ test ! -e "$dsh_home/.agent-presets/pristine"
 cp -R preset "$dsh_home/.agent-presets/pristine"
 ```
 
+### After installing
+
 Fully restart DeepSeek Harness, create a blank session, and select
 **Pristine**. Do not switch an active session from a different preset.
 
@@ -163,25 +217,26 @@ Run the local zero-dependency tests with:
 npm test
 ```
 
-## Important behavior
+## Behavior notes
 
-- The warmup is fail-soft: if the model route cannot be resolved, the first
-  step is rejected, or the run is aborted, the warmup is skipped and the real
-  input proceeds unchanged.
-- The warmup consumes one real turn (and its tokens) and is visible in the
-  trajectory. Every fresh session pays it — the main session and each
-  spawn-backed subagent (`subagents: false` opts subagents out).
-- Sessions that already recorded a `request/header` (resumed or reloaded
-  sessions) do not warm up again.
-- Fork subagent sessions skip the warmup: they inherit the parent's completed
-  turns, so their first request cannot be pure Minimal.
-- The catalog is narrowed only while a warmup is pending: while pending it is
-  narrowed to zero tools, and the following turn gets the full catalog back.
-- On Windows, the selected Git Bash/WSL shell is fail-soft: if it is missing
-  or misconfigured, the preset logs a warning and falls back to `pwsh`.
-- The preset has the same trust level as shell access. Review its files before
-  installation.
-- The plugin performs no network requests and adds no telemetry.
+- **Failure handling.** The warmup is fail-soft: if the model route cannot be
+  resolved, the first step is rejected, or the run is aborted, the warmup is
+  skipped and the real input proceeds unchanged.
+- **Cost and visibility.** The warmup consumes one real turn (and its tokens)
+  and is visible in the trajectory. Every fresh session pays it — the main
+  session and each spawn-backed subagent (`subagents: false` opts subagents
+  out).
+- **One warmup per fresh session.** Sessions that already recorded a
+  `request/header` (resumed or reloaded sessions) do not warm up again.
+- **Catalog scope.** The catalog is narrowed only while a warmup is pending:
+  while pending it is narrowed to zero tools, and the following turn gets the
+  full catalog back.
+- **Windows fallback.** On Windows, the selected Git Bash/WSL shell is
+  fail-soft: if it is missing or misconfigured, the preset logs a warning and
+  falls back to `pwsh`.
+- **Trust.** The preset has the same trust level as shell access. Review its
+  files before installation.
+- **Privacy.** The plugin performs no network requests and adds no telemetry.
 
 ## Official ecosystem guidance
 
